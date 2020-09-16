@@ -1,7 +1,7 @@
 close all
-
+tic
 freq = 40;
-timeToRun = 10; %in sec
+timeToRun = 20; %in sec
 pauseArg = 1/freq/2;
 
 
@@ -17,7 +17,7 @@ else
 end
 
 %define figure
-f = figure('Name', 'flickering','units', 'normalized', 'position', [0 0 1 1]);
+f = figure('Name', 'flickering','units', 'normalized', 'position', [0.3 0.3 0.35 0.35]);
 set(gca, 'color','black')
 set(gca,'LooseInset',get(gca,'TightInset'))% get rid of margines
 set(gca,'xtick', [], 'ytick', [])% get rid of axis
