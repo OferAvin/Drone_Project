@@ -1,6 +1,7 @@
 clear ; close all; clc
-
-VideoObject = VideoReader("C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\ScreenFlickerCropped.mp4");
+curPath = pwd;
+vidPath = [curPath '\ScreenFlickerCropped.mp4'];
+VideoObject = VideoReader(vidPath);
 i = 0; %Iteration intialization
 
 % video is 34.15 seconds long, divide by 8 is 4.268 seconds in real time.
@@ -10,7 +11,7 @@ fps = 240;
 %Allocations
 width = VideoObject.Width;
 height = VideoObject.Height;
-frames_N = VideoObject.NumFrames;
+frames_N = floor(VideoObject.Duration*VideoObject.FrameRate);
 grayFrames = zeros(height, width, frames_N);
 
 %Creating Frames array
