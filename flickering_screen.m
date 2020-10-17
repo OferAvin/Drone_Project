@@ -1,13 +1,15 @@
 close all
 
-tic
+refreshRT = 60;
 freq = 40;
-timeToRun = 20; %in sec
-pauseArg = 1/freq/2;
+timeToRun = 10; %in sec
+dt = 1/refreshRT;
+
+binarySteady = binaryStimInit(refreshRT,freq,timeToRun);
 
 
 %choose colors
-colors = 'yb'; %yb for yellow and blue or bw for black and white
+colors = 'bw'; %yb for yellow and blue or bw for black and white
 
 if (colors == 'yb')
     cor1 = [1, 1, 0.85];
@@ -28,12 +30,16 @@ set(f,'MenuBar', 'none');%get rid of toolbar
 
 
 %flicker
-t = freq*timeToRun;
+t = timeToRun;
+count=1;
 while(t > 0)
-    pause(pauseArg)
-    set(gca, 'color',cor1)
-    pause(pauseArg)
-    set(gca, 'color',cor2)
-    t = t-1;
+    if binarySteady(count) == 1
+        set(gca, 'color',cor1)
+    else
+        set(gca, 'color',cor2)
+    end
+    t = t-dt;
+    count = count+1;
+    pause(dt)
 end
 
