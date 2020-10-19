@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 fs = 512; % Sampling frequency (samples per second) 
 dt = 1/fs; % seconds per sample 
 StopTime = 10; % seconds 
@@ -26,3 +27,41 @@ T = 1/F ;
 tt = 0:dt:T+dt ;
 d = sin(2*pi*F*tt) ;
 plot(tt,d) ;
+=======
+function [binarySteady] = binaryStimInit(refreshRate,freqList,stimTime,figureFlag)
+%% This function creats 3 vectors containing a binary sequence of sine waves 
+% freqList - list of frequencies to create [Hz]
+% refreshRate - refresh rate for the monitor [Hz]
+% stimTime - overall time of binary sequence [sec]
+% figureFlag - would you like to show the output waves?
+
+
+%% Default visualization to zero
+if nargin<4
+    figureFlag = 0;
+elseif nargin<3
+    disp('Missing time variable (or function input order is messed up...)');
+    return
+end
+
+% Initialize variables
+dt = 1/refreshRate;
+time  = 0:dt:stimTime;                 % overall stim time
+binarySteady = [];
+
+%% Create sine wave
+for freq = 1:length(freqList) 
+    binarySteady(freq,:) = cos(2*pi*freqList(freq).*time);  
+end
+
+%% Change to binary signal (0 & 1) for total dark and total white
+binarySteady(binarySteady>0) = 1;
+binarySteady(binarySteady<0) = 0;
+
+%% Visualization for debugging
+if figureFlag
+    figure;
+    stem(time,binarySteady);
+    xlabel('sec');
+end
+>>>>>>> 788e853611a90a85654eb1d7ce5ec23843dcf922
