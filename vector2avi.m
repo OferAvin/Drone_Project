@@ -1,4 +1,4 @@
-function vidObj = vector2avi(vec, FPS)
+function vidObj = vector2avi(vec, FPS, fileName)
 
 %Defualt FPS is 30
 if nargin < 2
@@ -18,7 +18,7 @@ end
 
 
 %Create video object
-vidObj = VideoWriter('SSVEP');
+vidObj = VideoWriter(fileName);
 vidObj.FrameRate = FPS; %set your frame rate
 
 %Write the avi file
