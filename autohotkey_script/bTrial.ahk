@@ -1,14 +1,12 @@
 ^w::
 Send ^2
-run, wmplayer C:\Users\ofera\Studies\drone_proj\ScreenFlicker.mp4 /fullscreen , , ,pidd
-Sleep 5000
+run, wmplayer "C:\Users\ofera\Studies\drone_proj\Relevant Video\flicker_7.5Hz.avi" /fullscreen
+Sleep 60000
 WinKill Windows Media Player
+Sleep 30000
 
 
 return
 
 
 
-^y::
-SoundBeep, 1600, 600
-return
