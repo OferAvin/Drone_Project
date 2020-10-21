@@ -19,5 +19,5 @@ data.filtered = EEG.data; %Full recording.
 data.before = data.filtered(vidStartTime - 5*EEG.srate : vidStartTime); %Take 5 seconds before the video starts.
 data.after = data.filtered(vidEndTime : vidEndTime + 5*EEG.srate); %Take 5 seconds after the video ends.
 data.video = data.filtered(vidStartTime : vidEndTime); %Take the video time signal.
- clearvars -except data
+clearvars -except data
 
