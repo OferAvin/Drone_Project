@@ -1,8 +1,10 @@
 ^w::
 Send ^2
-run, wmplayer C:\Users\ofera\Studies\drone_proj\ScreenFlicker.mp4 /fullscreen , , ,pidd
-Sleep 5000
+run, wmplayer C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\Long_6Hz_chess.avi /fullscreen , , ,pidd
+Sleep 60000
 WinKill Windows Media Player
+Sleep 30000
+
 
 
 return
