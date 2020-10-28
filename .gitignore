@@ -2,3 +2,4 @@
 /Videos/*.avi
 /eeg/eeg_records/*.dsi
 /eeg/eeg_records/*.csv
+/eeg/EEGLAB_sets/*
