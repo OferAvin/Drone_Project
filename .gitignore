@@ -1,3 +1,4 @@
 /Videos/*.mp4
 /Videos/*.avi
 /eeg/eeg_records/*.dsi
+/eeg/eeg_records/*.csv
