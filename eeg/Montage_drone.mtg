@@ -37,32 +37,32 @@ Trigger color [RBG]
 Reserved color [RBG]
 0, 0, 255,
 Reference position:
-Pz
+Cz
 Montage positions:
-Fp1,Vref,
-Fp2,Vref,
-F3,Vref,
-Fz,Vref,
-F4,Vref,
-F7,Vref,
-F8,Vref,
-C3,Vref,
-Cz,Vref,
-C4,Vref,
-T3,Vref,
-T4,Vref,
-P3,Vref,
-P4,Vref,
-T5,Vref,
-T6,Vref,
-O1,Vref,
-O2,Vref,
-A1,Vref,
-A2,Vref,
-Pz,Vref,
-X3,Pz,
-X2,Pz,
-X1,Pz,
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
 List of reference channels: ,
 A1,A2,
 Scale:
