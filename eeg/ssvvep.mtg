@@ -1,0 +1,92 @@
+Headset index: ,2,
+Number of plots:  ,21,
+List of Plot colors [RBG]
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+0, 0, 0, 
+BKGND color [RBG]
+255, 255, 255, 
+Tracer color [RBG]
+128, 128, 128, 
+Grid color [RBG]
+192, 192, 192, 
+Trigger color [RBG]
+0, 0, 255, 
+Reserved color [RBG]
+0, 0, 255, 
+Reference position:
+Pz
+Montage positions:
+O1,Vref,
+O2,Vref,
+F3,Pz,
+Fz,Pz,
+F4,Pz,
+F7,Pz,
+F8,Pz,
+C3,Pz,
+Cz,Pz,
+C4,Pz,
+T3,Pz,
+T4,Pz,
+P3,Pz,
+P4,Pz,
+T5,Pz,
+T6,Pz,
+O1,Pz,
+O2,Pz,
+A1,Pz,
+A2,Pz,
+Pz,Pz,
+X3,Pz,
+X2,Pz,
+X1,Pz,
+List of reference channels: ,
+A1,A2,
+Scale:
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA

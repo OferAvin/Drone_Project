@@ -9,8 +9,8 @@
 # To verify correct plotting, one can introduce an artifact in the data and observe its effects on the plots.
 
 # The sample code is not certified to any specific standard. It is not intended for clinical use.
-# The sample code and software that makes use of it, should not be used for diagnostic or other clinical purposes.  
-# The sample code is intended for research use and is provided on an "AS IS"  basis.  
+# The sample code and software that makes use of it, should not be used for diagnostic or other clinical purposes.
+# The sample code is intended for research use and is provided on an "AS IS"  basis.
 # WEARABLE SENSING, INCLUDING ITS SUBSIDIARIES, DISCLAIMS ANY AND ALL WARRANTIES
 # EXPRESSED, STATUTORY OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY IMPLIED WARRANTIES OF
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT OR THIRD PARTY RIGHTS.
@@ -23,7 +23,15 @@ import matplotlib.pyplot as plt
 import threading
 import time
 import mne
+import scipy
 from scipy import signal
+
+#Bandpower function
+def bandpower(x, fs, fmin, fmax):
+    f, Pxx = scipy.signal.periodogram(x, fs=fs)
+    ind_min = scipy.argmax(f > fmin) - 1
+    ind_max = scipy.argmax(f > fmax) - 1
+    return scipy.trapz(Pxx[ind_min: ind_max], f[ind_min: ind_max])
 
 class TCPParser: # The script contains one main class which handles DSI-Streamer data packet parsing.
 
@@ -43,9 +51,9 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 
 		self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 		self.sock.connect((self.host,self.port))
-		
+
 	def parse_data(self):
-		
+
 		# parse_data() receives DSI-Streamer TCP/IP packets and updates the signal_log and time_log attributes
 		# which capture EEG data and time data, respectively, from the last 100 EEG data packets (by default) into a numpy array.
 		while not self.done:
@@ -59,7 +67,7 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 				self.data_log = b''
 
 
-				for index, packet_header in enumerate(self.latest_packet_headers):		
+				for index, packet_header in enumerate(self.latest_packet_headers):
 					# For each packet in the transmission, the script will append the signal data and timestamps to their respective logs.
 					if packet_header[0] == 1:
 						if np.shape(self.signal_log)[0] == 1:												# The signal_log must be initialized based on the headset and number of available channels.
@@ -98,8 +106,7 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 			self.latest_packet_headers = []
 
 	def example_plot(self):
-
-		# example_plot() uses the threading Python library and matplotlib to plot the EEG data in realtime. 
+		# example_plot() uses the threading Python library and matplotlib to plot the EEG data in realtime.
 		# The plots are unlabeled but users can refer to the TCP/IP Socket Protocol Documentation to understand how to discern the different plots given their indices.
 		# Ideally, each EEG plot should have its own subplot but for demonstrative purposes, they are all plotted on the same figure.
 		data_thread = threading.Thread(target=self.parse_data)
@@ -113,29 +120,66 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 
 		while True: # runtime < duration/refresh_rate:
 			time.sleep(2) #Wait 2 seconds
-			self.signal_log = self.signal_log[:,-600:] #Pull 2 seconds
-			self.time_log = self.time_log[:,-600:]
+			#Getting only the wanted electrodes
+			elec = np.zeros((1,2))
+			elec[0,0] = self.montage.index('O1')
+			elec[0,1] = self.montage.index('O2')
+			elec = elec.astype(int)
+
+			#Getting Laplace electrodes
+			lap_R = np.zeros((1,2))
+			lap_R[0,0] = self.montage.index('P4')
+			lap_R[0,1] = self.montage.index('T6')
+			lap_R = lap_R.astype(int)
+
+			lap_L = np.zeros((1,2))
+			lap_L[0,0] = self.montage.index('P3')
+			lap_L[0,1] = self.montage.index('T5')
+			lap_L = lap_L.astype(int)
+
+
+			#Creating raw object
+			#Raw = mne.io.RawArray(mysignal)
 
 			#Filtering the data
-			#self.signal_log = mne.filter.filter_data(self.signal_log, sfreq=300, l_freq=1, h_freq=40, )
+			Filtered = mne.filter.filter_data(self.signal_log, sfreq=300, l_freq=2, h_freq=40, verbose=0)
 
-			f, Pxx_den = signal.welch(self.signal_log, 300)
+			#Getting wanted electrodes
+			mysignal = Filtered[elec[0], -600:] #Pull 2 seconds
+			self.time_log = self.time_log[:, -600:]
+
+			ref_R = np.mean(Filtered[lap_R[0], -600:], axis = 0) #Pull 2 seconds
+			ref_L = np.mean(Filtered[lap_L[0], -600:], axis = 0) #Pull 2 seconds
+
+			#Laplace Filter
+			ref = np.vstack((ref_L, ref_R))
+			mysignal = mysignal - ref
+
+			#Welch
+			f, Pxx_den = signal.welch(mysignal, 300, scaling='spectrum')
+
+			#Plots
 			plt.clf()
 			try:
 				plt.semilogy(f[:52], np.transpose(Pxx_den[:, :52]))
 			except: pass
-			plt.gca().legend(self.montage)
+			plt.gca().legend(['O1','O2'])
 			plt.xlabel('Frequency [Hz]')
 			plt.ylabel('Power')
 			plt.title('DSI-Streamer Power Spectrum')
+			plt.xlim(1,40)
 			plt.pause(refresh_rate)
+			print(f"Alpha power in O1 : {bandpower(Filtered[0,:], 300, 8, 12)}")
+			print(f"Alpha power in O2 : {bandpower(Filtered[1,:], 300, 8, 12)}")
+			print()
 			runtime += 1
+
 		plt.show()
 
 		self.done = True
 		data_thread.join()
 
-		
+
 if __name__ == "__main__":
 
 	# The script will automatically run the example_plot() method if not called from another script.
