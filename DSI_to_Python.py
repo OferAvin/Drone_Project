@@ -9,8 +9,8 @@
 # To verify correct plotting, one can introduce an artifact in the data and observe its effects on the plots.
 
 # The sample code is not certified to any specific standard. It is not intended for clinical use.
-# The sample code and software that makes use of it, should not be used for diagnostic or other clinical purposes.  
-# The sample code is intended for research use and is provided on an "AS IS"  basis.  
+# The sample code and software that makes use of it, should not be used for diagnostic or other clinical purposes.
+# The sample code is intended for research use and is provided on an "AS IS"  basis.
 # WEARABLE SENSING, INCLUDING ITS SUBSIDIARIES, DISCLAIMS ANY AND ALL WARRANTIES
 # EXPRESSED, STATUTORY OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY IMPLIED WARRANTIES OF
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT OR THIRD PARTY RIGHTS.
@@ -51,9 +51,9 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 
 		self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 		self.sock.connect((self.host,self.port))
-		
+
 	def parse_data(self):
-		
+
 		# parse_data() receives DSI-Streamer TCP/IP packets and updates the signal_log and time_log attributes
 		# which capture EEG data and time data, respectively, from the last 100 EEG data packets (by default) into a numpy array.
 		while not self.done:
@@ -67,7 +67,7 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 				self.data_log = b''
 
 
-				for index, packet_header in enumerate(self.latest_packet_headers):		
+				for index, packet_header in enumerate(self.latest_packet_headers):
 					# For each packet in the transmission, the script will append the signal data and timestamps to their respective logs.
 					if packet_header[0] == 1:
 						if np.shape(self.signal_log)[0] == 1:												# The signal_log must be initialized based on the headset and number of available channels.
@@ -179,7 +179,7 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 		self.done = True
 		data_thread.join()
 
-		
+
 if __name__ == "__main__":
 
 	# The script will automatically run the example_plot() method if not called from another script.
