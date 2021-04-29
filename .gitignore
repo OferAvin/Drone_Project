@@ -5,3 +5,4 @@
 /eeg/EEGLAB_sets/*
 *.npy
 *.pyc
+/oldStuff/*

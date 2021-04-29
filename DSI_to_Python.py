@@ -137,11 +137,15 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 		refresh_rate = 0.03
 		duration = 60	# The default plot duration is 60 seconds.
 		runtime = 0
-		SSVEP = np.load(r"C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\NumpyFiles\feature_mat.npy")
-		SSVEP_labels = np.load(r"C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\NumpyFiles\labels.npy")
-		classifier = lgbm.sklearn.LGBMClassifier()
-		classifier.fit(SSVEP, SSVEP_labels)
+		# SSVEP = np.load(r"C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\NumpyFiles\feature_mat.npy")
+		# SSVEP_labels = np.load(r"C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\NumpyFiles\labels.npy")
+		# classifier = lgbm.sklearn.LGBMClassifier()
+		# classifier.fit(SSVEP, SSVEP_labels)
 
+		"""
+		Add here the calibration at the beggining of the recording in order to choose 
+		the thershold for classification
+		"""
 
 
 		while True: # runtime < duration/refresh_rate:
