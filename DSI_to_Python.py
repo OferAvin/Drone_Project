@@ -143,7 +143,7 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 		# classifier.fit(SSVEP, SSVEP_labels)
 
 		"""
-		Add here the calibration at the beggining of the recording in order to choose 
+		Add here the calibration at the beggining of the recording in order to choose
 		the thershold for classification
 		"""
 
