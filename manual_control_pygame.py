@@ -3,9 +3,11 @@ import cv2
 import pygame
 import numpy as np
 import time
+import warnings
+import datetime
 
 # Speed of the drone
-S = 60
+S = 30
 # Frames per second of the pygame window display
 # A low number also results in input lag, as input information is processed once per frame.
 FPS = 120
@@ -28,7 +30,7 @@ class FrontEnd(object):
 
         # Creat pygame window
         pygame.display.set_caption("Tello video stream")
-        self.screen = pygame.display.set_mode([960, 720], pygame.FULLSCREEN)
+        self.screen = pygame.display.set_mode([960, 720])#, pygame.FULLSCREEN)
 
         # Init Tello object that interacts with the Tello drone
         self.tello = Tello()
@@ -45,7 +47,7 @@ class FrontEnd(object):
         # create update timer
         pygame.time.set_timer(pygame.USEREVENT + 1, 1000 // FPS)
 
-    def run(self):
+    def run(self, table):
         countFrame = 0
         self.tello.connect()
         self.tello.set_speed(self.speed)
@@ -61,7 +63,43 @@ class FrontEnd(object):
 
             for event in pygame.event.get():
                 if event.type == pygame.USEREVENT + 1:
-                    self.update()
+                    #self.update()
+                    if table.empty() == True:
+                        self.update()
+                    else:
+                        command = table.get()
+                        if command == 6:
+                            event.key = 119
+                            self.keydown(event.key)
+                            self.update()
+                            time.sleep(1)
+                            self.keyup(event.key)
+                            self.update()
+                            time.sleep(0.5)
+                            self.update()
+                            time.sleep(0.5)
+                        if command == 7:
+                            event.key = 115
+                            self.keydown(event.key)
+                            self.update()
+                            time.sleep(1)
+                            self.keyup(event.key)
+                            self.update()
+                            time.sleep(0.5)
+                            self.update()
+                            time.sleep(0.5)
+                        # elif command == 2:
+                        #     event.key = 115
+                        #     self.keydown(event.key)
+                        #     self.update()
+                            # time.sleep(0.5)
+                            # self.keyup(event.key)
+                            # self.update()
+                            # time.sleep(0.5)
+                            # self.update()
+                            # time.sleep(0.5)
+
+
                 elif event.type == pygame.QUIT:
                     should_stop = True
                 elif event.type == pygame.KEYDOWN:
@@ -71,6 +109,10 @@ class FrontEnd(object):
                         self.keydown(event.key)
                 elif event.type == pygame.KEYUP:
                     self.keyup(event.key)
+
+
+            if frame_read.stopped:
+                break
 
             if frame_read.stopped:
                 break
@@ -111,7 +153,8 @@ class FrontEnd(object):
         Arguments:
             key: pygame key
         """
-        if key == pygame.K_UP:  # set forward velocity
+        print(key)
+        if key == pygame.K_UP:  # set forward velocity value = 1073741906
             self.for_back_velocity = S
         elif key == pygame.K_DOWN:  # set backward velocity
             self.for_back_velocity = -S
@@ -155,11 +198,12 @@ class FrontEnd(object):
                 self.up_down_velocity, self.yaw_velocity)
 
 
-def main():
+def main(table):
+
     frontend = FrontEnd()
 
     # run frontend
-    frontend.run()
+    frontend.run(table)
 
 
 if __name__ == '__main__':

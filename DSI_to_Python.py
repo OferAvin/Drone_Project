@@ -25,6 +25,25 @@ import time
 import mne
 import scipy
 from scipy import signal
+import lightgbm as lgbm
+
+
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return idx
+
+def get_bandpower(x, target, f, stride):
+    idx = find_nearest(f, target)
+    power_val = np.zeros([2,1])
+    power_val[:, 0] = np.mean(x[:, idx-stride : idx+stride + 1], axis=1)
+    return power_val
+
+def get_maxpower(x, target, f, stride):
+    idx = find_nearest(f, target)
+    power_val = np.zeros([2,1])
+    power_val[:, 0] = np.max(x[:, idx-stride : idx+stride + 1], axis=1)
+    return power_val
 
 #Bandpower function
 def bandpower(x, fs, fmin, fmax):
@@ -48,6 +67,9 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 		self.montage = []
 		self.fsample = 0
 		self.fmains = 0
+		self.classifier = None
+		self.table = None
+
 
 		self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 		self.sock.connect((self.host,self.port))
@@ -105,37 +127,43 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 			self.latest_packets = []
 			self.latest_packet_headers = []
 
-	def example_plot(self):
+	def example_plot(self,table):
 		# example_plot() uses the threading Python library and matplotlib to plot the EEG data in realtime.
 		# The plots are unlabeled but users can refer to the TCP/IP Socket Protocol Documentation to understand how to discern the different plots given their indices.
 		# Ideally, each EEG plot should have its own subplot but for demonstrative purposes, they are all plotted on the same figure.
 		data_thread = threading.Thread(target=self.parse_data)
 		data_thread.start()
-
+		self.table = table
 		refresh_rate = 0.03
 		duration = 60	# The default plot duration is 60 seconds.
 		runtime = 0
+		SSVEP = np.load(r"C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\NumpyFiles\feature_mat.npy")
+		SSVEP_labels = np.load(r"C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\NumpyFiles\labels.npy")
+		classifier = lgbm.sklearn.LGBMClassifier()
+		classifier.fit(SSVEP, SSVEP_labels)
 
-		fig = plt.figure()
+
 
 		while True: # runtime < duration/refresh_rate:
 			time.sleep(2) #Wait 2 seconds
 			#Getting only the wanted electrodes
-			elec = np.zeros((1,2))
-			elec[0,0] = self.montage.index('O1')
-			elec[0,1] = self.montage.index('O2')
+			elec = np.zeros((1, 2))
+			elec[0, 0] = self.montage.index('O1')
+			elec[0, 1] = self.montage.index('O2')
+
+
 			elec = elec.astype(int)
 
 			#Getting Laplace electrodes
-			lap_R = np.zeros((1,2))
-			lap_R[0,0] = self.montage.index('P4')
-			lap_R[0,1] = self.montage.index('T6')
-			lap_R = lap_R.astype(int)
-
-			lap_L = np.zeros((1,2))
-			lap_L[0,0] = self.montage.index('P3')
-			lap_L[0,1] = self.montage.index('T5')
-			lap_L = lap_L.astype(int)
+			# lap_R = np.zeros((1,2))
+			# lap_R[0, 0] = self.montage.index('P4')
+			# lap_R[0, 1] = self.montage.index('T6')
+			# lap_R = lap_R.astype(int)
+			#
+			# lap_L = np.zeros((1,2))
+			# lap_L[0,0] = self.montage.index('P3')
+			# lap_L[0,1] = self.montage.index('T5')
+			# lap_L = lap_L.astype(int)
 
 
 			#Creating raw object
@@ -146,31 +174,69 @@ class TCPParser: # The script contains one main class which handles DSI-Streamer
 
 			#Getting wanted electrodes
 			mysignal = Filtered[elec[0], -600:] #Pull 2 seconds
-			self.time_log = self.time_log[:, -600:]
-
-			ref_R = np.mean(Filtered[lap_R[0], -600:], axis = 0) #Pull 2 seconds
-			ref_L = np.mean(Filtered[lap_L[0], -600:], axis = 0) #Pull 2 seconds
-
-			#Laplace Filter
-			ref = np.vstack((ref_L, ref_R))
-			mysignal = mysignal - ref
+			# self.time_log = self.time_log[:, -600:]
+			#
+			# ref_R = np.mean(Filtered[lap_R[0], -600:], axis = 0) #Pull 2 seconds
+			# ref_L = np.mean(Filtered[lap_L[0], -600:], axis = 0) #Pull 2 seconds
+			#
+			# #Laplace Filter
+			# ref = np.vstack((ref_L, ref_R))
+			# mysignal = mysignal - ref
 
 			#Welch
 			f, Pxx_den = signal.welch(mysignal, 300, scaling='spectrum')
+			main_power = np.zeros((1,2))
+			#Get features
+			target_frq = [6]
+			harm_frq = np.multiply([2, 3, 4, 5, 6], target_frq)
+			stride = 0
+			feature = np.zeros([1, 12])
+			feature[0, :2] = get_maxpower(Pxx_den, target_frq, f, stride)[0:1]
+			feature[0, 2:4] = get_maxpower(Pxx_den, harm_frq[0], f, stride)[0:1]
+			feature[0, 4:6] = get_maxpower(Pxx_den, harm_frq[1], f, stride)[0:1]
+			feature[0, 6:8] = get_maxpower(Pxx_den, harm_frq[2], f, stride)[0:1]
+			feature[0, 8:10] = get_bandpower(Pxx_den, target_frq, f, stride)[0:1]
+			main_power[0,0] = np.sum(feature[0, 0:6])
 
+			target_frq = [7.5]
+			harm_frq = np.multiply([2, 3, 4, 5, 6], target_frq)
+			stride = 0
+			feature = np.zeros([1, 12])
+			feature[0, :2] = get_maxpower(Pxx_den, target_frq, f, stride)[0:1]
+			feature[0, 2:4] = get_maxpower(Pxx_den, harm_frq[0], f, stride)[0:1]
+			feature[0, 4:6] = get_maxpower(Pxx_den, harm_frq[1], f, stride)[0:1]
+			feature[0, 6:8] = get_maxpower(Pxx_den, harm_frq[2], f, stride)[0:1]
+			feature[0, 8:10] = get_bandpower(Pxx_den, target_frq, f, stride)[0:1]
+			main_power[0, 1] = np.sum(feature[0, 0:6])
+
+
+			#Predict
+			if main_power[0, 0] > 23 and main_power[0, 1] > 23:
+				y_pred = 0
+			elif main_power[0, 0] > 23:
+				y_pred = 6
+			elif main_power[0, 1] > 23:
+				y_pred = 7
+			else:
+				y_pred = 0
+			#y_pred = classifier.predict(feature)
+			self.table.put(y_pred)
+
+			print(y_pred)
 			#Plots
 			plt.clf()
 			try:
-				plt.semilogy(f[:52], np.transpose(Pxx_den[:, :52]))
+				plt.plot(f[1:52], np.transpose(Pxx_den[:, 1:52]))
 			except: pass
-			plt.gca().legend(['O1','O2'])
+			plt.gca().legend(['O1', 'O2', 'P3', 'P4'])
 			plt.xlabel('Frequency [Hz]')
 			plt.ylabel('Power')
 			plt.title('DSI-Streamer Power Spectrum')
 			plt.xlim(1,40)
+			plt.ylim(0,100)
 			plt.pause(refresh_rate)
-			print(f"Alpha power in O1 : {bandpower(Filtered[0,:], 300, 8, 12)}")
-			print(f"Alpha power in O2 : {bandpower(Filtered[1,:], 300, 8, 12)}")
+			# print(f"Alpha power in O1 : {bandpower(Filtered[0,:], 300, 8, 12)}")
+			# print(f"Alpha power in O2 : {bandpower(Filtered[1,:], 300, 8, 12)}")
 			print()
 			runtime += 1
 
