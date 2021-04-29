@@ -30,7 +30,7 @@ class FrontEnd(object):
 
         # Creat pygame window
         pygame.display.set_caption("Tello video stream")
-        self.screen = pygame.display.set_mode([960, 720])#, pygame.FULLSCREEN)
+        self.screen = pygame.display.set_mode([960, 720])  # , pygame.FULLSCREEN)
 
         # Init Tello object that interacts with the Tello drone
         self.tello = Tello()
@@ -49,6 +49,11 @@ class FrontEnd(object):
 
     def run(self, table):
         countFrame = 0
+        # Start only when calibration is done
+        # TODO: do it smarter.
+        while table.get() != 999:
+            pass
+
         self.tello.connect()
         self.tello.set_speed(self.speed)
 
@@ -57,48 +62,30 @@ class FrontEnd(object):
         self.tello.streamon()
 
         frame_read = self.tello.get_frame_read()
+        flight_flag = False
 
         should_stop = False
         while not should_stop:
-
             for event in pygame.event.get():
                 if event.type == pygame.USEREVENT + 1:
-                    #self.update()
-                    if table.empty() == True:
+                    # self.update()
+                    if table.empty():
                         self.update()
                     else:
                         command = table.get()
+                        # Up
                         if command == 6:
-                            event.key = 119
-                            self.keydown(event.key)
-                            self.update()
-                            time.sleep(1)
-                            self.keyup(event.key)
-                            self.update()
-                            time.sleep(0.5)
-                            self.update()
-                            time.sleep(0.5)
-                        if command == 7:
-                            event.key = 115
-                            self.keydown(event.key)
-                            self.update()
-                            time.sleep(1)
-                            self.keyup(event.key)
-                            self.update()
-                            time.sleep(0.5)
-                            self.update()
-                            time.sleep(0.5)
-                        # elif command == 2:
-                        #     event.key = 115
-                        #     self.keydown(event.key)
-                        #     self.update()
-                            # time.sleep(0.5)
-                            # self.keyup(event.key)
-                            # self.update()
-                            # time.sleep(0.5)
-                            # self.update()
-                            # time.sleep(0.5)
-
+                            if flight_flag:
+                                self.tello.move_up(100)
+                            else:
+                                self.tello.takeoff()
+                                flight_flag = True
+                        # Down
+                        elif command == 7:
+                            self.tello.move_down(100)
+                        # Flip
+                        elif command == 69:
+                            self.tello.flip_back()
 
                 elif event.type == pygame.QUIT:
                     should_stop = True
@@ -110,7 +97,6 @@ class FrontEnd(object):
                 elif event.type == pygame.KEYUP:
                     self.keyup(event.key)
 
-
             if frame_read.stopped:
                 break
 
@@ -119,22 +105,11 @@ class FrontEnd(object):
 
             self.screen.fill([0, 0, 0])
 
+            # Display next frame
             frame = frame_read.frame
-            if countFrame % 10 == 0:
-                frame[300:375, 825:900, :] = 0
-                cv2.arrowedLine(frame, (835, 333), (890, 333), (255, 255, 255), 5, tipLength=0.5)
-            if countFrame % 20 == 0:
-                frame[300:375, 75:150, :] = 0
-                cv2.arrowedLine(frame, (140, 333), (85, 333), (255, 255, 255), 5, tipLength=0.5)
-            if countFrame % 16 == 0:
-                frame[50:125, 450:525, :] = 0
-                cv2.arrowedLine(frame, (485, 115), (485, 60), (255, 255, 255), 5, tipLength=0.5)
-            if countFrame % 8 == 0:
-                frame[600:675, 450:525, :] = 0
-                cv2.arrowedLine(frame, (485, 610), (485, 665), (255, 255, 255), 5, tipLength=0.5)
             text = "Battery: {}%".format(self.tello.get_battery())
             cv2.putText(frame, text, (5, 720 - 5),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = np.rot90(frame)
             frame = np.flipud(frame)
@@ -195,11 +170,10 @@ class FrontEnd(object):
         """ Update routine. Send velocities to Tello."""
         if self.send_rc_control:
             self.tello.send_rc_control(self.left_right_velocity, self.for_back_velocity,
-                self.up_down_velocity, self.yaw_velocity)
+                                       self.up_down_velocity, self.yaw_velocity)
 
 
 def main(table):
-
     frontend = FrontEnd()
 
     # run frontend

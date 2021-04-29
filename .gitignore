@@ -6,6 +6,9 @@
 /eeg/EEGLAB_sets/*
 *.npy
 *.pyc
+*.mp4
 /oldStuff/*
 .idea
 .idea/*
+/.idea
+
