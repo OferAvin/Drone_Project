@@ -7,4 +7,5 @@
 *.npy
 *.pyc
 /oldStuff/*
-/.idea
+.idea
+.idea/*
