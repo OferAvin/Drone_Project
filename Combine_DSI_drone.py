@@ -3,6 +3,7 @@ import DSI_to_Python as dsi
 import threading, queue
 import numpy as np
 import Show_Flashes
+from multiprocessing import Process
 
 
 if __name__ == "__main__":
@@ -13,12 +14,12 @@ if __name__ == "__main__":
     table = queue.Queue(0)
     tDsi = threading.Thread(target=tcp.example_plot, args=(table,))
     tDrone = threading.Thread(target=drone.main ,args=(table,))
-    tFlicker = threading.Thread(target=Show_Flashes.main)
+    pFlicker = Process(target=Show_Flashes.main)
 
     #tcp.example_plot()
     tDsi.start()
-    while table.get != 999:
+    while table.get() != 999:
         pass
     tDrone.start()
-    tFlicker.start()
+    pFlicker.start()
 

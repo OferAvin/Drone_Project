@@ -176,7 +176,7 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
         elec[0, 0] = self.montage.index('O1')
         elec[0, 1] = self.montage.index('O2')
         elec = elec.astype(int)
-        target_frq = [6, 7.5, 10]
+        target_frq = [6, 7.5, 11]
 
         """
         Add here the calibration at the beggining of the recording in order to choose

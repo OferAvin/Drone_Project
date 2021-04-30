@@ -3,6 +3,7 @@ import cv2
 import pygame
 import numpy as np
 import time
+import os
 import warnings
 import datetime
 
@@ -25,6 +26,9 @@ class FrontEnd(object):
     """
 
     def __init__(self):
+        x = 10
+        y = 60
+        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (x, y)
         # Init pygame
         pygame.init()
 
@@ -49,11 +53,6 @@ class FrontEnd(object):
 
     def run(self, table):
         countFrame = 0
-        # Start only when calibration is done
-        # TODO: do it smarter.
-        while table.get() != 999:
-            pass
-
         self.tello.connect()
         self.tello.set_speed(self.speed)
 
