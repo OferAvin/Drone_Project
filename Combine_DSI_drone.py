@@ -1,7 +1,6 @@
 import manual_control_pygame as drone
 import DSI_to_Python as dsi
 import threading, queue
-import numpy as np
 import Show_Flashes
 from multiprocessing import Process
 

@@ -184,7 +184,7 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
         """
 
         count = 0
-        calibration_t = 0.5  # Time in minutes for calibration
+        calibration_t = 1  # Time in minutes for calibration
         chunk_N = round(calibration_t * 60 / chunk_t)
 
         # First Data sampling
