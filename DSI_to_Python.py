@@ -17,7 +17,7 @@
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT OR THIRD PARTY RIGHTS.
 #
 # Copyright (c) 2014-2020 Wearable Sensing LLC
-
+import pickle
 import socket, struct, time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,8 +26,9 @@ import time
 import mne
 import scipy
 from scipy import signal
-import statistics
-import math
+from lightgbm import LGBMClassifier
+import pyttsx3
+from sklearn.model_selection import cross_val_score, RepeatedKFold
 
 
 def find_nearest(array, value):
@@ -172,67 +173,79 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
         # classifier = lgbm.sklearn.LGBMClassifier()
         # classifier.fit(SSVEP, SSVEP_labels)
         time.sleep(chunk_t * 2)
-        elec = np.zeros((1, 2))
+        elec = np.zeros((1, 4))
         elec[0, 0] = self.montage.index('O1')
         elec[0, 1] = self.montage.index('O2')
+
         elec = elec.astype(int)
         target_frq = [6, 7.5, 11]
+        action = [0, 6, 7, 69] # Idle, Up, Down, Flip
+        frq_N = len(target_frq)
+        elec_N = len(elec[0])
+
+        # Text to speech engine
+        engine = pyttsx3.init()
+        triggerText = ['Do not focus on the blinks', 'Focus on the upper blink',
+                       'focus on the bottom blink', 'Close your eyes']
 
         """
-        Add here the calibration at the beggining of the recording in order to choose
-        the thershold for classification
+        Add here the calibration at the beginning of the recording in order to choose
+        the threshold for classification
         """
 
-        count = 0
-        calibration_t = 1  # Time in minutes for calibration
-        chunk_N = round(calibration_t * 60 / chunk_t)
+        trials_N = 30  # Trials per condition
+        featureMat = np.zeros(((frq_N + 1) * trials_N, 251 * elec_N))
+        labels = np.zeros((frq_N + 1) * trials_N)
 
-        # First Data sampling
+        answer = input('Do you want to Load model?    Y/N')
 
-        # Filtering the data
-        Filtered = mne.filter.filter_data(self.signal_log, sfreq=Hz, l_freq=low_pass, h_freq=high_pass, verbose=0)
-        # Getting wanted electrodes
-        mysignal = Filtered[elec[0], -chunk_t * Hz:]  # Pull 2 seconds
-        # Welch
-        f, FFT = signal.welch(mysignal, Hz, nperseg=500, noverlap=450, scaling='spectrum')
-        # Mean the occipital electrodes power
-        FFT = np.expand_dims(np.mean(FFT, 0), 0)
+        if answer == 'N':
+            # Collecting labeled data
+            for i in range(frq_N + 1):
+                # Say the current stimuli to focus on
+                engine.say(triggerText[i])
+                engine.runAndWait()
+                for trial in range(trials_N):
+                    labels[trial + trials_N * (i - 1)] = action[i]
+                    time.sleep(chunk_t)
+                    # Filtering the data
+                    Filtered = mne.filter.filter_data(self.signal_log, sfreq=Hz, l_freq=low_pass, h_freq=high_pass, verbose=0)
+                    # Getting wanted electrodes
+                    mysignal = Filtered[elec[0], -chunk_t * Hz:]  # Pull 2 seconds
+                    # Welch
+                    f, Pxx_den = signal.welch(mysignal, Hz, nperseg=500, noverlap=450, scaling='spectrum')
+                    featureMat[trial + trials_N * (i - 1), :] = Pxx_den.flatten()
 
-        while count < chunk_N:
-            time.sleep(chunk_t)
-            # Filtering the data
-            Filtered = mne.filter.filter_data(self.signal_log, sfreq=Hz, l_freq=low_pass, h_freq=high_pass, verbose=0)
-            # Getting wanted electrodes
-            mysignal = Filtered[elec[0], -chunk_t * Hz:]  # Pull 2 seconds
-            # Welch
-            f, Pxx_den = signal.welch(mysignal, Hz, nperseg=500, noverlap=450, scaling='spectrum')
-            # Mean the occipital electrodes power
-            Pxx_den = np.expand_dims(np.mean(Pxx_den, 0), 0)
 
-            # Add the computed FFt and add one to count
-            FFT = np.append(FFT, Pxx_den, 0)
-            count += 1
+            # Say training session is over
+            engine.say('Open your eyes')
+            engine.runAndWait()
 
-        # Compute mean an std for all frequencies
-        FFT_std = np.std(FFT, 0)
-        FFT_mean = np.mean(FFT, 0)
+            # Train classifier
+            model = LGBMClassifier()
+            cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
+            n_scores = cross_val_score(model, featureMat, labels, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1,
+                                       error_score='raise')
+            model.fit(featureMat, labels)
 
-        # Get threshold per frequency
+            # Save model file
+            pkl_filename = "TrainedLGBM.pkl"
+            with open(pkl_filename, 'wb') as file:
+                pickle.dump(model, file)
+            np.save('Features', featureMat)
+            np.save('Labels', labels)
 
-        threshold = np.zeros((1, len(target_frq)))
-        for i in range(len(target_frq)):
-            # if target_frq[i] == 10:
-            #     high_limit = FFT_mean + (2.5 * FFT_std)
-            #     idx = find_nearest(f, target_frq[i])
-            #     threshold[0, i] = high_limit[idx]
-            # else:
-            high_limit = FFT_mean + (2 * FFT_std)
-            idx = find_nearest(f, target_frq[i])
-            threshold[0, i] = high_limit[idx]
+            # Print cross validation mean and accuracy
+            print('Accuracy: %.3f (%.3f)' % (np.mean(n_scores), np.std(n_scores)))
+            # Send command when training session has ended
+        else:
+            # load the model from disk
+            model = pickle.load(open('TrainedLGBM.pkl', 'rb'))
 
-        # Send command when calibration has ended
+        # Ready to go signal
         self.table.put(999)
 
+        prev_pred = 0
         while True:  # runtime < duration/refresh_rate:
             time.sleep(chunk_t)  # Wait 2 seconds
 
@@ -241,54 +254,42 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
 
             # Getting wanted electrodes
             mysignal = Filtered[elec[0], -chunk_t * Hz:]  # Pull 2 seconds
+
+            features = np.zeros((1, 251 * elec_N))
+
             # Welch
             f, Pxx_den = signal.welch(mysignal, Hz, nperseg=500, noverlap=450, scaling='spectrum')
-            # Mean the two occipital electrodes
-            Pxx_den = np.expand_dims(np.mean(Pxx_den, 0), 0)
-
             # Get features
+            features[0, :] = Pxx_den.flatten()
 
-            main_power = np.zeros((1, len(target_frq)))
-            for i in range(len(target_frq)):
-                main_power[0, i] = feature_extract(target_frq[i], Pxx_den, f, 1)
 
             # Predict
-            # TODO: make generic
-            if main_power[0, 0] > threshold[0, 0] and main_power[0, 1] > threshold[0, 1]\
-                    or (main_power[0, 0] > threshold[0, 0] and main_power[0, 2] > threshold[0, 2])\
-                    or (main_power[0, 1] > threshold[0, 1] and main_power[0, 2] > threshold[0, 2]):
-                y_pred = 0
-            elif main_power[0, 0] > threshold[0, 0]:
-                y_pred = 6
-            elif main_power[0, 1] > threshold[0, 1]:
-                y_pred = 7
-            elif main_power[0, 2] > 2 * threshold[0, 2]:
-                y_pred = 69  # Flip
-            else:
-                y_pred = 0
+            y_pred = model.predict(features)
 
+
+            # Send prediction only if it is not idle
             self.table.put(y_pred)
             print(y_pred)
 
             # Plots
-            plt.clf()
-            try:
-                idx_40 = find_nearest(f, 40)
-                plt.plot(f[1:idx_40], np.transpose(Pxx_den[:, 1:idx_40]), label='Line1')
-                plt.plot(f[1:idx_40], high_limit[1:idx_40], label="Line2")
-            except:
-                pass
-            plt.gca().legend(['Power', 'Limit'])
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Power')
-            plt.title('DSI-Streamer Power Spectrum')
-            plt.xlim(1, 40)
-            plt.ylim(0, 100)
-            plt.pause(refresh_rate)
-            print()
-            runtime += 1
-
-        plt.show()
+        #     plt.clf()
+        #     try:
+        #         idx_40 = find_nearest(f, 40)
+        #         plt.plot(f[1:idx_40], np.transpose(Pxx_den[:, 1:idx_40]), label='Line1')
+        #         plt.plot(f[1:idx_40], high_limit[1:idx_40], label="Line2")
+        #     except:
+        #         pass
+        #     plt.gca().legend(['Power', 'Limit'])
+        #     plt.xlabel('Frequency [Hz]')
+        #     plt.ylabel('Power')
+        #     plt.title('DSI-Streamer Power Spectrum')
+        #     plt.xlim(1, 40)
+        #     plt.ylim(0, 100)
+        #     plt.pause(refresh_rate)
+        #     print()
+        #     runtime += 1
+        #
+        # plt.show()
 
         self.done = True
         data_thread.join()

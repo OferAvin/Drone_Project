@@ -12,13 +12,14 @@ if __name__ == "__main__":
 
     table = queue.Queue(0)
     tDsi = threading.Thread(target=tcp.example_plot, args=(table,))
-    tDrone = threading.Thread(target=drone.main ,args=(table,))
+    tDrone = threading.Thread(target=drone.main, args=(table,))
     pFlicker = Process(target=Show_Flashes.main)
 
     #tcp.example_plot()
     tDsi.start()
+    pFlicker.start()
     while table.get() != 999:
         pass
     tDrone.start()
-    pFlicker.start()
+
 

@@ -75,13 +75,13 @@ class FrontEnd(object):
                         # Up
                         if command == 6:
                             if flight_flag:
-                                self.tello.move_up(100)
+                                self.tello.move_up(50)
                             else:
                                 self.tello.takeoff()
                                 flight_flag = True
                         # Down
                         elif command == 7:
-                            self.tello.move_down(100)
+                            self.tello.move_down(50)
                         # Flip
                         elif command == 69:
                             self.tello.flip_back()
