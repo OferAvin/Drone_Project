@@ -62,8 +62,8 @@ class FrontEnd(object):
 
         frame_read = self.tello.get_frame_read()
         flight_flag = False
-
         should_stop = False
+
         while not should_stop:
             for event in pygame.event.get():
                 if event.type == pygame.USEREVENT + 1:
@@ -72,19 +72,29 @@ class FrontEnd(object):
                         self.update()
                     else:
                         command = table.get()
+                        timeStamp = str(datetime.datetime.now())
+                        print('Command for Drone: ' + str(command) + 'at time ' + timeStamp)
                         # Up
                         if command == 6:
                             if flight_flag:
-                                self.tello.move_up(50)
+                                # self.tello.move_up(50)
+                                self.tello.send_rc_control(0, 0, 30, 0)
+                                time.sleep(1)
+                                self.tello.send_rc_control(0, 0, 0, 0)
                             else:
                                 self.tello.takeoff()
                                 flight_flag = True
+                                time.sleep(1.95)
                         # Down
                         elif command == 7:
-                            self.tello.move_down(50)
-                        # Flip
+                            # self.tello.move_down(50)
+                            self.tello.send_rc_control(0, 0, -30, 0)
+                            time.sleep(1)
+                            self.tello.send_rc_control(0, 0, 0, 0)
+                            # Flip
                         elif command == 69:
                             self.tello.flip_back()
+                            time.sleep(1.95)
 
                 elif event.type == pygame.QUIT:
                     should_stop = True

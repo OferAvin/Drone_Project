@@ -29,6 +29,7 @@ from scipy import signal
 from lightgbm import LGBMClassifier
 import pyttsx3
 from sklearn.model_selection import cross_val_score, RepeatedKFold
+import datetime
 
 
 def find_nearest(array, value):
@@ -269,7 +270,8 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
 
             # Send prediction only if it is not idle
             self.table.put(y_pred)
-            print(y_pred)
+            timeStamp = str(datetime.datetime.now())
+            print('Classifier output is: ' + str(y_pred) + 'at time ' + timeStamp)
 
             # Plots
         #     plt.clf()
