@@ -18,6 +18,7 @@ def main():
     clipArray = clips_array([[clip1], [clip2]])
     clipArray.preview()
 
+
 if __name__ == '__main__':
     main()
 

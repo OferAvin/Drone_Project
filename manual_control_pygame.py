@@ -49,7 +49,7 @@ class FrontEnd(object):
         self.send_rc_control = False
 
         # create update timer
-        pygame.time.set_timer(pygame.USEREVENT + 1, 1000 // FPS)
+        pygame.time.set_timer(pygame.USEREVENT + 1, 1000 // FPS) # Change 1000 to 0.
 
     def run(self, table):
         countFrame = 0

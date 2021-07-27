@@ -20,6 +20,7 @@
 import pickle
 import socket, struct, time
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import threading
 import time
@@ -30,48 +31,74 @@ from lightgbm import LGBMClassifier
 import pyttsx3
 from sklearn.model_selection import cross_val_score, RepeatedKFold
 import datetime
+from enum import Enum
 
 
-def find_nearest(array, value):
-    array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
-    return idx
+class Predictions(Enum):
+    idle = 0
+    up = 6
+    down = 7
+    flip = 69
 
 
-def get_bandpower(x, target, f, stride):
-    idx = find_nearest(f, target)
-    power_val = np.zeros([2, 1])
-    power_val[:, 0] = np.mean(x[:, idx - stride: idx + stride + 1], axis=1)
-    return power_val
-
-
-def get_maxpower(x, target, f, stride):
-    idx = find_nearest(f, target)
-    # power_val = np.zeros([2, 1])
-    power_val = np.max(x[:, idx - stride: idx + stride + 1], axis=1)
-    return power_val
-
-
-# Bandpower function
-def bandpower(x, fs, fmin, fmax):
-    f, Pxx = scipy.signal.periodogram(x, fs=fs)
-    ind_min = scipy.argmax(f > fmin) - 1
-    ind_max = scipy.argmax(f > fmax) - 1
-    return scipy.trapz(Pxx[ind_min: ind_max], f[ind_min: ind_max])
-
-
-def feature_extract(frq, Pxx_den, f, harmonics_N):
+def signalProc(signalArray, elecMonatage):
     """
-    Sum the power of the frequency with the harmonics
+    "Signal processing function" that responsible for cleaning,  channel selection,  feature extraction
+      input:data chunk nparray(n_channels , n_samples), electrode montage
+      output:  Pandas DataFrame of Features
     """
-    harm_frq = np.multiply(range(2, harmonics_N + 2), frq)
-    frq = np.append(frq, harm_frq)
-    stride = 0
-    feature = np.zeros([1, len(frq)])
-    for i in range(len(frq)):
-        feature[0, i] = get_maxpower(Pxx_den, frq[i], f, stride)
-    main_power = np.sum(feature)
-    return main_power
+    # TODO: Parameters should come from a YAML file
+    low_pass = 4
+    high_pass = 40
+    Hz = 300
+    # Choosing electrodes (Using only occipital)
+    elec = np.zeros((1, 2))
+    # TODO: the electrodes indexes are in the DSI object (what does it mean to the function signature?)
+    #  should we pass the object?  it cannot come from a YAML, because the montage is set in the DSI object.
+    elec[0, 0] = elecMonatage.index('O1')
+    elec[0, 1] = elecMonatage.index('O2')
+    elec = elec.astype(int)
+
+    # Choose electrodes
+    signalArray = signalArray[elec[0], :]
+    # Filtering the data
+    Filtered = mne.filter.filter_data(signalArray, sfreq=Hz, l_freq=low_pass, h_freq=high_pass, verbose=0)
+    # Welch
+    # TODO: Enter the welch parameters to the YAML file as well.
+    f, Pxx_den = signal.welch(Filtered, Hz, nperseg=500, noverlap=450, scaling='spectrum')
+
+    # Flatten the power spectrum
+    features = Pxx_den.flatten()
+    # Convert to data frame
+    featuresDF = pd.DataFrame(features)
+    # Return data frame
+    return featuresDF
+
+
+def trainModel(dataFrame, labels):
+    # Create model object
+    model = LGBMClassifier()
+
+    # Fit
+    model.fit(dataFrame, labels)
+
+    # Save model file TODO: How do we want to save the model, should we add a default parameter?
+    # pkl_filename = "TrainedLGBM.pkl"
+    # with open(pkl_filename, 'wb') as file:
+    #     pickle.dump(model, file)
+
+    return model
+
+
+def predictModel(dataFrame, model):
+    # Predict
+    pred = model.predict(dataFrame)
+
+    # Convert to ENUM
+    pred = Predictions(pred)
+
+    # Return prediction value
+    return pred
 
 
 class TCPParser:  # The script contains one main class which handles DSI-Streamer data packet parsing.
@@ -154,150 +181,108 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
             self.latest_packets = []
             self.latest_packet_headers = []
 
-    def example_plot(self, table):
-        # example_plot() uses the threading Python library and matplotlib to plot the EEG data in realtime. The plots
-        # are unlabeled but users can refer to the TCP/IP Socket Protocol Documentation to understand how to discern
-        # the different plots given their indices. Ideally, each EEG plot should have its own subplot but for
-        # demonstrative purposes, they are all plotted on the same figure.
+    def trainingSession(self, table):
+        """
+        Calicration and creation of new model by offline trainging of SSVEP Paradigm
+        input: table - queue
+        output: trained model - output is written into the queue
+        """
         data_thread = threading.Thread(target=self.parse_data)
         data_thread.start()
         self.table = table
-        refresh_rate = 0.03
-        duration = 60  # The default plot duration is 60 seconds.
-        runtime = 0
+        # TODO: Ofer is making a YAML file, will be implanted here instead of all those parameters
         Hz = 300
-        low_pass = 4
-        high_pass = 40
         chunk_t = 2
-        # SSVEP = np.load(r"C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\NumpyFiles\feature_mat.npy")
-        # SSVEP_labels = np.load(r"C:\Users\ophir\Desktop\Uni\BCI\Drone_Project\NumpyFiles\labels.npy")
-        # classifier = lgbm.sklearn.LGBMClassifier()
-        # classifier.fit(SSVEP, SSVEP_labels)
-        time.sleep(chunk_t * 2)
-        elec = np.zeros((1, 4))
-        elec[0, 0] = self.montage.index('O1')
-        elec[0, 1] = self.montage.index('O2')
+        trials_N = 30  # Trials per condition
 
-        elec = elec.astype(int)
+        # Let the signal accumulate before start
+        time.sleep(chunk_t * 2)
+
+        # Used frequencies
         target_frq = [6, 7.5, 11]
-        action = [0, 6, 7, 69] # Idle, Up, Down, Flip
+        action = [0, 6, 7, 69]  # Idle, Up, Down, Flip
+
+        # Number of frequencies
         frq_N = len(target_frq)
-        elec_N = len(elec[0])
 
         # Text to speech engine
         engine = pyttsx3.init()
         triggerText = ['Do not focus on the blinks', 'Focus on the upper blink',
                        'focus on the bottom blink', 'Close your eyes']
 
-        """
-        Add here the calibration at the beginning of the recording in order to choose
-        the threshold for classification
-        """
-
-        trials_N = 30  # Trials per condition
-        featureMat = np.zeros(((frq_N + 1) * trials_N, 251 * elec_N))
+        # Allocation
         labels = np.zeros((frq_N + 1) * trials_N)
+        featuresDF = pd.DataFrame()
 
-        answer = input('Do you want to Load model?    Y/N')
-
-        if answer == 'N':
-            # Collecting labeled data
-            for i in range(frq_N + 1):
-                # Say the current stimuli to focus on
-                engine.say(triggerText[i])
-                engine.runAndWait()
-                for trial in range(trials_N):
-                    labels[trial + trials_N * (i - 1)] = action[i]
-                    time.sleep(chunk_t)
-                    # Filtering the data
-                    Filtered = mne.filter.filter_data(self.signal_log, sfreq=Hz, l_freq=low_pass, h_freq=high_pass, verbose=0)
-                    # Getting wanted electrodes
-                    mysignal = Filtered[elec[0], -chunk_t * Hz:]  # Pull 2 seconds
-                    # Welch
-                    f, Pxx_den = signal.welch(mysignal, Hz, nperseg=500, noverlap=450, scaling='spectrum')
-                    featureMat[trial + trials_N * (i - 1), :] = Pxx_den.flatten()
-
-
-            # Say training session is over
-            engine.say('Open your eyes')
+        # Collecting labeled data
+        for i in range(frq_N + 1):
+            # Say the current stimuli to focus on
+            engine.say(triggerText[i])
             engine.runAndWait()
+            for trial in range(trials_N):
+                # Save current trial label
+                labels[trial + trials_N * (i - 1)] = action[i]
+                # Wait for needed time
+                time.sleep(chunk_t)
+                # Take wanted samples (from the start of the trial until now)
+                signalArray = self.signal_log[:, -chunk_t * Hz:]
 
-            # Train classifier
-            model = LGBMClassifier()
-            cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
-            n_scores = cross_val_score(model, featureMat, labels, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1,
-                                       error_score='raise')
-            model.fit(featureMat, labels)
+                # Process the data
+                curTrialData = signalProc(signalArray, self.montage)
+                # Append to the data frame
+                featuresDF = featuresDF.append(curTrialData)
 
-            # Save model file
-            pkl_filename = "TrainedLGBM.pkl"
-            with open(pkl_filename, 'wb') as file:
-                pickle.dump(model, file)
-            np.save('Features', featureMat)
-            np.save('Labels', labels)
+        # Say training session is over
+        engine.say('Open your eyes')
+        engine.runAndWait()
 
-            # Print cross validation mean and accuracy
-            print('Accuracy: %.3f (%.3f)' % (np.mean(n_scores), np.std(n_scores)))
-            # Send command when training session has ended
-        else:
-            # load the model from disk
-            model = pickle.load(open('TrainedLGBM.pkl', 'rb'))
+        # Train classifier
+        model = trainModel(featuresDF, labels)
 
-        # Ready to go signal
-        self.table.put(999)
+        # Write the model
+        self.table.put(model)
+        # TODO: Kill the thread? the DSI object is still needed....
 
-        prev_pred = 0
-        while True:  # runtime < duration/refresh_rate:
-            time.sleep(chunk_t)  # Wait 2 seconds
+    def onlineSession(self, model, table):
+        # TODO: Debug the threads things, something feels fishy
+        # Start thread
+        data_thread = threading.Thread(target=self.parse_data)
+        data_thread.start()
+        self.table = table
 
-            # Filtering the data
-            Filtered = mne.filter.filter_data(self.signal_log, sfreq=Hz, l_freq=low_pass, h_freq=high_pass, verbose=0)
+        # TODO: All the parameters should come from a YAML file
+        chunk_t = 2
+        Hz = 300
+        # TODO: Need to check what the ctrl+C kills, is it this thread or the entire run
+        #  i checked, thi
+        try:
+            while True:  # To exit loop press ctrl+C
+                time.sleep(chunk_t)  # Wait 2 seconds
 
-            # Getting wanted electrodes
-            mysignal = Filtered[elec[0], -chunk_t * Hz:]  # Pull 2 seconds
+                # Take wanted samples (from the start of the trial until now)
+                signalArray = self.signal_log[:, -chunk_t * Hz:]
 
-            features = np.zeros((1, 251 * elec_N))
+                # Process the data
+                curTrialData = signalProc(signalArray, self.montage)
+                # Append to the data frame
+                y_pred = predictModel(curTrialData, model)
 
-            # Welch
-            f, Pxx_den = signal.welch(mysignal, Hz, nperseg=500, noverlap=450, scaling='spectrum')
-            # Get features
-            features[0, :] = Pxx_den.flatten()
+                # Send prediction
+                self.table.put(y_pred)
+                timeStamp = str(datetime.datetime.now())
+                print('Classifier output is: ' + str(y_pred) + 'at time ' + timeStamp)
 
-
-            # Predict
-            y_pred = model.predict(features)
-
-
-            # Send prediction only if it is not idle
-            self.table.put(y_pred)
-            timeStamp = str(datetime.datetime.now())
-            print('Classifier output is: ' + str(y_pred) + 'at time ' + timeStamp)
-
-            # Plots
-        #     plt.clf()
-        #     try:
-        #         idx_40 = find_nearest(f, 40)
-        #         plt.plot(f[1:idx_40], np.transpose(Pxx_den[:, 1:idx_40]), label='Line1')
-        #         plt.plot(f[1:idx_40], high_limit[1:idx_40], label="Line2")
-        #     except:
-        #         pass
-        #     plt.gca().legend(['Power', 'Limit'])
-        #     plt.xlabel('Frequency [Hz]')
-        #     plt.ylabel('Power')
-        #     plt.title('DSI-Streamer Power Spectrum')
-        #     plt.xlim(1, 40)
-        #     plt.ylim(0, 100)
-        #     plt.pause(refresh_rate)
-        #     print()
-        #     runtime += 1
-        #
-        # plt.show()
-
-        self.done = True
-        data_thread.join()
+        except KeyboardInterrupt:
+            # TODO: add a command that indicates the session is done (drones lands and code exit smoothly)
+            pass
+        finally:
+            # End recording and join threads
+            self.done = True
+            data_thread.join()
 
 
 if __name__ == "__main__":
     # The script will automatically run the example_plot() method if not called from another script.
     tcp = TCPParser('localhost', 8844)
-    tcp.example_plot()
+    tcp.trainingSession()
+    tcp.onlineSession()
