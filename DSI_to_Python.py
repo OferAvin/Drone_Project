@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import threading
 import time
 import mne
-import scipy
+import signal as sig
 from scipy import signal
 from lightgbm import LGBMClassifier
 import pyttsx3
@@ -80,7 +80,7 @@ def trainModel(dataFrame, labels):
     model = LGBMClassifier()
 
     # Fit
-    model.fit(dataFrame, labels)
+    model.fit(dataFrame.transpose(), labels)
 
     # Save model file TODO: How do we want to save the model, should we add a default parameter?
     # pkl_filename = "TrainedLGBM.pkl"
@@ -92,7 +92,7 @@ def trainModel(dataFrame, labels):
 
 def predictModel(dataFrame, model):
     # Predict
-    pred = model.predict(dataFrame)
+    pred = model.predict(dataFrame.transpose())
 
     # Convert to ENUM
     pred = Predictions(pred)
@@ -119,6 +119,14 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
         self.table = None
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
+        self.runOnline = False
+
+    def onlineHandler(self):
+        """
+        Set the running flag for the online process to false (stop running)
+        """
+        self.runOnline = False
+        sig.signal(sig.SIGINT, sig.SIG_DFL)
 
     def parse_data(self):
         # parse_data() receives DSI-Streamer TCP/IP packets and updates the signal_log and time_log attributes which
@@ -193,7 +201,7 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
         # TODO: Ofer is making a YAML file, will be implanted here instead of all those parameters
         Hz = 300
         chunk_t = 2
-        trials_N = 30  # Trials per condition
+        trials_N = 1  # Trials per condition
 
         # Let the signal accumulate before start
         time.sleep(chunk_t * 2)
@@ -230,7 +238,7 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
                 # Process the data
                 curTrialData = signalProc(signalArray, self.montage)
                 # Append to the data frame
-                featuresDF = featuresDF.append(curTrialData)
+                featuresDF = pd.concat([featuresDF, curTrialData], axis=1)
 
         # Say training session is over
         engine.say('Open your eyes')
@@ -241,11 +249,17 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
 
         # Write the model
         self.table.put(model)
+
+        # End recording and join threads
+        self.done = True
+        data_thread.join()
+
         # TODO: Kill the thread? the DSI object is still needed....
 
     def onlineSession(self, model, table):
+        self.runOnline = True
         # TODO: Debug the threads things, something feels fishy
-        # Start thread
+        # Start parse thread
         data_thread = threading.Thread(target=self.parse_data)
         data_thread.start()
         self.table = table
@@ -254,31 +268,27 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
         chunk_t = 2
         Hz = 300
         # TODO: Need to check what the ctrl+C kills, is it this thread or the entire run
-        #  i checked, thi
-        try:
-            while True:  # To exit loop press ctrl+C
-                time.sleep(chunk_t)  # Wait 2 seconds
+        #  i checked, it kills the main thread. need to find better solution. (daemon thread?)
+        while self.runOnline:  # To exit loop press ctrl+C
+            time.sleep(chunk_t)  # Wait 2 seconds
 
-                # Take wanted samples (from the start of the trial until now)
-                signalArray = self.signal_log[:, -chunk_t * Hz:]
+            # Take wanted samples (from the start of the trial until now)
+            signalArray = self.signal_log[:, -chunk_t * Hz:]
 
-                # Process the data
-                curTrialData = signalProc(signalArray, self.montage)
-                # Append to the data frame
-                y_pred = predictModel(curTrialData, model)
+            # Process the data
+            curTrialData = signalProc(signalArray, self.montage)
+            # Append to the data frame
+            y_pred = predictModel(curTrialData, model)
 
-                # Send prediction
-                self.table.put(y_pred)
-                timeStamp = str(datetime.datetime.now())
-                print('Classifier output is: ' + str(y_pred) + 'at time ' + timeStamp)
+            # Send prediction
+            self.table.put(y_pred)
+            timeStamp = str(datetime.datetime.now())
+            print('Classifier output is: ' + str(y_pred) + 'at time ' + timeStamp)
 
-        except KeyboardInterrupt:
-            # TODO: add a command that indicates the session is done (drones lands and code exit smoothly)
-            pass
-        finally:
-            # End recording and join threads
-            self.done = True
-            data_thread.join()
+        # End recording and join threads
+        self.done = True
+        data_thread.join()
+        # TODO: add stop command to the rest of the threads
 
 
 if __name__ == "__main__":
