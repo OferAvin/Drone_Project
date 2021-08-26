@@ -6,13 +6,22 @@ import time
 import os
 import warnings
 import datetime
+from enum import Enum
+
+
+# TODO: Class is copied here and in the DSI, need to make it global.
+class Commands(Enum):
+    idle = 0
+    up = 6
+    down = 7
+    flip = 69
+    stop = 'Stop'
 
 # Speed of the drone
 S = 30
 # Frames per second of the pygame window display
 # A low number also results in input lag, as input information is processed once per frame.
 FPS = 120
-
 
 class FrontEnd(object):
     """ Maintains the Tello display and moves it through the keyboard keys.
@@ -46,10 +55,10 @@ class FrontEnd(object):
         self.yaw_velocity = 0
         self.speed = 10
 
-        self.send_rc_control = False
+        self.rc_control_flg = False
 
         # create update timer
-        pygame.time.set_timer(pygame.USEREVENT + 1, 1000 // FPS) # Change 1000 to 0.
+        # pygame.time.set_timer(pygame.USEREVENT + 1, 1000 // FPS) # Change 1000 to 0.
 
     def run(self, table):
         countFrame = 0
@@ -63,51 +72,35 @@ class FrontEnd(object):
         frame_read = self.tello.get_frame_read()
         flight_flag = False
         should_stop = False
-
         while not should_stop:
-            for event in pygame.event.get():
-                if event.type == pygame.USEREVENT + 1:
-                    # self.update()
-                    if table.empty():
-                        self.update()
+            command = table.get()
+            self.tello.commandDone = False
+            while self.tello.commandDone == False:
+                timeStamp = str(datetime.datetime.now())
+                print('Command for Drone: ' + str(command[0]) + ' at time ' + timeStamp)
+                # Up
+                if command[0] == Commands.up:
+                    if flight_flag:
+                        # self.tello.move_up(50)
+                        self.tello.send_rc_control(0, 0, 30, 0)
+                        time.sleep(1)
+                        self.tello.send_rc_control(0, 0, 0, 0)
                     else:
-                        command = table.get()
-                        timeStamp = str(datetime.datetime.now())
-                        print('Command for Drone: ' + str(command) + 'at time ' + timeStamp)
-                        # Up
-                        if command == 6:
-                            if flight_flag:
-                                # self.tello.move_up(50)
-                                self.tello.send_rc_control(0, 0, 30, 0)
-                                time.sleep(1)
-                                self.tello.send_rc_control(0, 0, 0, 0)
-                            else:
-                                self.tello.takeoff()
-                                flight_flag = True
-                                time.sleep(1.95)
-                        # Down
-                        elif command == 7:
-                            # self.tello.move_down(50)
-                            self.tello.send_rc_control(0, 0, -30, 0)
-                            time.sleep(1)
-                            self.tello.send_rc_control(0, 0, 0, 0)
-                            # Flip
-                        elif command == 69:
-                            self.tello.flip_back()
-                            time.sleep(1.95)
-
-                elif event.type == pygame.QUIT:
+                        self.tello.takeoff()
+                        flight_flag = True
+                        time.sleep(1.95)
+                # Down
+                elif command[0] == Commands.down:
+                    # self.tello.move_down(50)
+                    self.tello.send_rc_control(0, 0, -30, 0)
+                    time.sleep(1)
+                    self.tello.send_rc_control(0, 0, 0, 0)
+                    # Flip
+                elif command[0] == Commands.flip:
+                    self.tello.flip_back()
+                    time.sleep(1.95)
+                elif command[0] == Commands.stop:
                     should_stop = True
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        should_stop = True
-                    else:
-                        self.keydown(event.key)
-                elif event.type == pygame.KEYUP:
-                    self.keyup(event.key)
-
-            if frame_read.stopped:
-                break
 
             if frame_read.stopped:
                 break
@@ -170,14 +163,14 @@ class FrontEnd(object):
             self.yaw_velocity = 0
         elif key == pygame.K_t:  # takeoff
             self.tello.takeoff()
-            self.send_rc_control = True
+            self.rc_control_flg = True
         elif key == pygame.K_l:  # land
             not self.tello.land()
-            self.send_rc_control = False
+            self.rc_control_flg = False
 
     def update(self):
         """ Update routine. Send velocities to Tello."""
-        if self.send_rc_control:
+        if self.rc_control_flg:
             self.tello.send_rc_control(self.left_right_velocity, self.for_back_velocity,
                                        self.up_down_velocity, self.yaw_velocity)
 

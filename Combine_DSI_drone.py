@@ -5,37 +5,39 @@ import queue
 import Show_Flashes
 from multiprocessing import Process
 import signal as sig
+from ModelDSI import trainingSession, onlineSession
+import pickle
+from manual_control_pygame import Commands
 
 if __name__ == "__main__":
-    # TODO: Threads!! which thread is running when and how?
     tcp = dsi.TCPParser('localhost', 8844)
-    # drone1 = drone.FrontEnd()
+    # Catch ctrl+C error
     sig.signal(sig.SIGINT, tcp.onlineHandler)
-
+    # Create queue
     q = queue.Queue(0)
-    # TODO : thread is not needed for training
-    tDsiTraining = threading.Thread(target=tcp.trainingSession, args=(q,))
+    # q.put([Commands(6), None, 0])
+    # q.put([Commands(6), None, 0])
+    # q.put([Commands(69), None, 0])
+    # q.put([Commands(7), None, 0])
+    # q.put([Commands(7), None, 0])
+
+    # Thread and process
     tDrone = threading.Thread(target=drone.main, args=(q,))
     pFlicker = Process(target=Show_Flashes.main)
-    # try:
-    tDsiTraining.start()
+
+    # Start training + Flicker process
     pFlicker.start()
-
-    # TODO: is it smart? at the moment it is the best solution i have found to time the threads.
-    # Do not continue to the drone control and online session, without having a model from the training session.
-
-
-    # Stop the main code until training session thread has ended
-    tDsiTraining.join()
-    model = q.get()
+    ans = input('Trainn ew model? Y/N')
+    if ans.upper() == 'Y':
+        model = trainingSession(tcp)    # Check for model existence
+    else:
+        model = pickle.load(open("TrainedLGBM.pkl", 'rb'))
     if not model:
         raise Exception("*****No model found in queue after training session*****")
-    # except Exception as err:
-    #     print(err)
+    #TODO add option to load model
 
-    print('everything seems fine till now')
     # After model is acquired, start the online session and the drone control.
-    tDsiOnline = threading.Thread(target=tcp.onlineSession, args=(model, q))
+    tDsiOnline = threading.Thread(target=onlineSession, args=(tcp, model, q))
     tDsiOnline.start()
     tDrone.start()
 
