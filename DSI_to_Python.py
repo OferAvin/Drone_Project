@@ -17,21 +17,10 @@
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT OR THIRD PARTY RIGHTS.
 #
 # Copyright (c) 2014-2020 Wearable Sensing LLC
-import pickle
+
 import socket, struct, time
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import threading
-import time
-import mne
 import signal as sig
-from scipy import signal
-from lightgbm import LGBMClassifier
-import pyttsx3
-from sklearn.model_selection import cross_val_score, RepeatedKFold
-import datetime
-from enum import Enum
 
 class TCPParser:  # The script contains one main class which handles DSI-Streamer data packet parsing.
     def __init__(self, host, port):

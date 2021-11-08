@@ -1,5 +1,5 @@
 from moviepy.editor import VideoFileClip, clips_array
-from moviepy.video.fx import all
+#from moviepy.video.fx import all
 import os
 import pygame
 

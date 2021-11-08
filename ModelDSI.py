@@ -8,7 +8,7 @@ from scipy import signal
 from lightgbm import LGBMClassifier
 import pyttsx3
 import datetime
-from manual_control_pygame import Commands
+from droneCtrl import Commands
 
 def signalProc(signalArray, elecMonatage):
     """
@@ -143,9 +143,9 @@ def onlineSession(DSIparser, model, q):
     data_thread.start()
     DSIparser.table = q
 
-    #DEBUG
-    coms = [Commands.up, Commands.up, Commands.flip, Commands.down, Commands.down, Commands.flip, Commands.up, Commands.up, Commands.up, Commands.stop]
-    i=0
+    # #DEBUG
+    # coms = [Commands.up, Commands.up, Commands.stop]#, Commands.down, Commands.flip, Commands.up, Commands.flip, Commands.idle, Commands.stop]
+    # i=0
 
     # TODO: All the parameters should come from a YAML file
     chunk_t = 2
@@ -163,9 +163,9 @@ def onlineSession(DSIparser, model, q):
         # Append to the data frame
         y_pred = predictModel(curTrialData, model)
 
-        # DEBUG
-        y_pred = coms[i]
-        i += 1
+        # # DEBUG
+        # y_pred = coms[i]
+        # i += 1
 
 
         # Send prediction
@@ -174,9 +174,9 @@ def onlineSession(DSIparser, model, q):
         DSIparser.table.put([y_pred, None, timeStamp])
         print('Classifier output is: ' + str(y_pred) + 'at time ' + timeStamp)
 
-        # DEBUG
-        if i >= len(coms):
-            break
+        # # DEBUG
+        # if i >= len(coms):
+        #     break
 
     # End recording and join threads
     DSIparser.done = True
