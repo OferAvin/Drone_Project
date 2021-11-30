@@ -18,7 +18,9 @@
 #
 # Copyright (c) 2014-2020 Wearable Sensing LLC
 
-import socket, struct, time
+#### update this file to match eeg.py from bci4als
+
+import socket, struct
 import numpy as np
 import signal as sig
 
@@ -37,10 +39,11 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
         self.fsample = 0
         self.fmains = 0
         self.classifier = None
-        self.table = None
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
         self.runOnline = False
+        self.previous_packet_data_timestamp = 0
+        self.fifo_len_sec = 10
 
     def onlineHandler(self):
         """
@@ -88,8 +91,8 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
 
                         self.signal_log = np.append(self.signal_log, self.latest_packet_data, 1)
                         self.time_log = np.append(self.time_log, self.latest_packet_data_timestamp, 1)
-                        self.signal_log = self.signal_log[:, -600:]
-                        self.time_log = self.time_log[:, -600:]
+                        self.signal_log = self.signal_log[:, int(-self.fifo_len_sec*self.fsample):]
+                        self.time_log = self.time_log[:, int(-self.fifo_len_sec*self.fsample):]
                     # Non-data packet handling
                     if packet_header[0] == 5:
                         (event_code, event_node) = struct.unpack('>II', self.latest_packets[index][12:20])
@@ -110,7 +113,16 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
             self.latest_packets = []
             self.latest_packet_headers = []
 
+    def get_epoch(self, epoch_len_sec):
+        if self.fifo_len_sec < epoch_len_sec:
+            raise Exception("Trying to read more than buffer size")
+        if self.latest_packet_data_timestamp-self.previous_packet_data_timestamp < epoch_len_sec :  #epoch samples are not ready yet
+            signalArray = None
+        else:
+            signalArray = self.signal_log[:, int(-epoch_len_sec * self.fsample):]
+            self.previous_packet_data_timestamp = self.latest_packet_data_timestamp
+        return signalArray
 
 if __name__ == "__main__":
     # The script will automatically run the example_plot() method if not called from another script.
-    tcp = TCPParser('localhost', 8844)
+    DSIparser = TCPParser('localhost', 8844)

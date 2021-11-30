@@ -1,3 +1,5 @@
+# present flashing stimuli (from mp4 files)
+
 from moviepy.editor import VideoFileClip, clips_array
 #from moviepy.video.fx import all
 import os

@@ -1,4 +1,5 @@
-
+# send control commands to the drone
+# present drone live video stream
 # to avoid IMU error, Fly in good lights and above floor with patterns
 
 from djitellopy import Tello
@@ -14,10 +15,14 @@ from enum import Enum
 
 class Commands(Enum):
     idle = 0
-    up = 6
-    down = 7
+    up = 1
+    down = 2
+    forward = 3
+    back = 4
+    left = 5
+    right = 6
     flip = 69
-    stop = 'Stop'
+    stop = -1
 
 is_active = True
 
@@ -55,7 +60,7 @@ def drone_video(tello):
         time.sleep(1 / FPS)
 
 
-def run(q):
+def run(CommandsQueue):
 
     move_distance = 30
     idle_sleep = 2 #sec
@@ -74,8 +79,8 @@ def run(q):
     while is_active:
 
         #execute next command from the que
-        if not q.empty():
-            command = q.get()
+        if not CommandsQueue.empty():
+            command = CommandsQueue.get()
             timeStamp = str(datetime.datetime.now())
             print('Command for Drone: ' + str(command[0]) + ' at time ' + timeStamp)
 
@@ -91,6 +96,14 @@ def run(q):
                 tello.move_up(move_distance)
             elif command[0] == Commands.down and is_airborn == True:
                 tello.move_down(move_distance)
+            elif command[0] == Commands.forward and is_airborn == True:
+                tello.move_forward(move_distance)
+            elif command[0] == Commands.back and is_airborn == True:
+                tello.move_back(move_distance)
+            elif command[0] == Commands.left and is_airborn == True:
+                tello.move_left(move_distance)
+            elif command[0] == Commands.right and is_airborn == True:
+                tello.move_right(move_distance)
             elif command[0] == Commands.flip and is_airborn == True:
                 tello.flip_back()
             elif command[0] == Commands.stop:
