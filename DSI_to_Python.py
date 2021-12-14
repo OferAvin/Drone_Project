@@ -23,6 +23,7 @@
 import socket, struct
 import numpy as np
 import signal as sig
+import threading
 
 class TCPParser:  # The script contains one main class which handles DSI-Streamer data packet parsing.
     def __init__(self, host, port):
@@ -41,6 +42,7 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
         self.classifier = None
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((self.host, self.port))
+        self.data_thread = None
         self.runOnline = False
         self.previous_packet_data_timestamp = 0
         self.fifo_len_sec = 10
@@ -122,6 +124,15 @@ class TCPParser:  # The script contains one main class which handles DSI-Streame
             signalArray = self.signal_log[:, int(-epoch_len_sec * self.fsample):]
             self.previous_packet_data_timestamp = self.latest_packet_data_timestamp
         return signalArray
+
+    def start(self):
+        # Start parse thread
+        self.data_thread = threading.Thread(target=self.parse_data)
+        self.data_thread.start()
+
+    def stop(self):
+        self.done = True
+        self.data_thread.join()
 
 if __name__ == "__main__":
     # The script will automatically run the example_plot() method if not called from another script.

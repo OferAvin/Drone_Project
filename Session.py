@@ -1,11 +1,14 @@
 # decode paradigms from EEG
 import pickle
-import threading
 import time
 import datetime
 from droneCtrl import Commands
 import SSVEPmodel
-import bci4als
+
+import sys
+sys.path.append('../bci4als/')
+from examples.offline_training import offline_experiment
+import src.bci4als.eeg as eeg
 
 class Session:
     """
@@ -26,15 +29,14 @@ class Session:
         self.epoch_len_sec = 2
         self.acc_thresh = 0.5 #accuracy threshold
 
+        self.eeg = eeg.EEG(DSIparser, self.epoch_len_sec)
+
     def trainMImodel(self, load_model = False):
-        # TODO:integrate bci4als training here
-        return
 
         if load_model:
             self.modelMI = pickle.load(open(self.modelMIfn, 'rb'))
         else:
-            self.modelMI = bci4als.ml_model.MLModel()
-            self.modelMI.offline_training()
+            self.modelMI = offline_experiment(self.eeg)
 
             with open(self.modelMIfn, 'wb') as file: #save model
                 pickle.dump(self.modelMI, file)
@@ -45,11 +47,9 @@ class Session:
         if load_model:
             self.modelSSVEP = pickle.load(open(self.modelSSVEPfn, 'rb'))
         else:
-            data_thread = threading.Thread(target=self.DSIparser.parse_data)
-            data_thread.start()
+            self.eeg.on()
             self.modelSSVEP = SSVEPmodel.trainModel(self.DSIparser,self.epoch_len_sec)
-            self.DSIparser.done = True
-            data_thread.join()
+            self.eeg.off()
 
             with open(self.modelSSVEPfn, 'wb') as file:  # save model
                 pickle.dump(self.modelSSVEP, file)
@@ -59,26 +59,19 @@ class Session:
     def run_online(self, CommandsQueue):
 
         self.DSIparser.runOnline = True
-
-        # Start parse thread
-        data_thread = threading.Thread(target=self.DSIparser.parse_data)
-        data_thread.start()
+        self.eeg.on()
 
         while self.DSIparser.runOnline:  # To exit loop press ctrl+C
             # TODO:  ctrl+C kills the main thread. need to find better solution. (daemon thread?)
 
             time.sleep(self.epoch_len_sec/2)  # Wait 1 second
-            signalArray = self.DSIparser.get_epoch(self.epoch_len_sec)
+            signalArray = self.eeg.get_board_data()
             if signalArray is None: #epoch samples are not ready yet
                 continue
 
             # Choose the best prediction
             command_pred = Commands.idle
-
-            #TODO:
-            # mi_pred, mi_acc = self.modelMI.online_predict(signalArray, self.modelMI)
-            mi_acc = 0
-
+            mi_pred, mi_acc = self.modelMI.online_predict(signalArray, self.eeg) # see bci4als/src/bci4als/experiments/online.py, try bci4als/examples/online_training.py
             if mi_acc >= self.acc_thresh:
                 command_pred = mi_pred
             ssvep_pred, ssvep_acc = SSVEPmodel.predictModel(signalArray, self.modelSSVEP, self.DSIparser)
@@ -90,6 +83,4 @@ class Session:
             CommandsQueue.put([command_pred, timeStamp])
             print('Classifier output is:  ' + command_pred.name.upper() + '  at time ' + timeStamp)
 
-        # End session and join threads
-        self.DSIparser.done = True
-        data_thread.join()
+        self.eeg.off()
