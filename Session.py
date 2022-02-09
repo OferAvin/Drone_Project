@@ -58,16 +58,33 @@ class Session:
 
     def run_online(self, CommandsQueue):
 
+        playback_flg = False
+
         self.DSIparser.runOnline = True
         self.eeg.on()
+
+        if playback_flg:
+            with open('SSVEPtraindata.pkl', 'rb') as file:
+                recordedSignal = pickle.load(file)
+                featuresDF = pickle.load(file)
+                labels = pickle.load(file)
+            cnt = 0
 
         while self.DSIparser.runOnline:  # To exit loop press ctrl+C
             # TODO:  ctrl+C kills the main thread. need to find better solution. (daemon thread?)
 
             time.sleep(self.epoch_len_sec/2)  # Wait 1 second
-            signalArray = self.eeg.get_board_data()
-            if signalArray is None: #epoch samples are not ready yet
-                continue
+
+            if playback_flg:
+                signalArray = recordedSignal[cnt, :, :]
+                print('  played label is: ' + Commands(labels[cnt]).name.upper())
+                cnt += 1
+                if cnt >= len(labels):
+                    break
+            else:
+                signalArray = self.eeg.get_board_data()
+                if signalArray is None: #epoch samples are not ready yet
+                    continue
 
             # Choose the best prediction
             command_pred = Commands.idle

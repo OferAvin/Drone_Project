@@ -8,6 +8,10 @@ import numpy as np
 import pandas as pd
 import time
 from droneCtrl import Commands
+from sklearn.model_selection import train_test_split
+from sklearn import metrics
+import matplotlib.pyplot as plt
+import pickle
 
 def signalProc(signalArray, DSIparser):
     """
@@ -23,7 +27,7 @@ def signalProc(signalArray, DSIparser):
     nperseg = 500
     noverlap = 450
     #electrodes of interest
-    electrodes = ["O1"]#, "O2"]
+    electrodes = ["O1", "O2"]
 
     # Get electrode indeces from the montage
     elec = []
@@ -61,51 +65,94 @@ def trainModel(DSIparser, epoch_len_sec):
     output: trained model - output is written into the queue
     """
 
-    # Parameters
-    trials_N = 15  # Trials per condition
-    target_frq = [6, 7.5, 11] # Used frequencies
-    frq_N = len(target_frq)
-    action = [Commands.idle, Commands.up, Commands.down, Commands.flip]
+    playback_flg = False
 
-    # Text to speech engine
-    engine = pyttsx3.init()
-    triggerText = ['Do not focus on the blinks', 'Focus on the upper blink',
-                   'focus on the bottom blink', 'Close your eyes']
+    if playback_flg:
+        with open('SSVEPtraindata.pkl', 'rb') as file:
+            recordedSignal = pickle.load(file)
+            featuresDF = pickle.load(file)
+            labels = pickle.load(file)
 
-    # Allocation
-    labels = np.zeros((frq_N + 1) * trials_N)
-    featuresDF = pd.DataFrame()
-
-    # Collecting labeled data
-    for i in range(frq_N + 1):
-        # Say the current stimuli to focus on
-        engine.say(triggerText[i])
-        engine.runAndWait()
-        iTrial = 0
-        while iTrial < trials_N:
-
-            time.sleep(epoch_len_sec/2)  # Wait 1 second
-            signalArray = DSIparser.get_epoch(epoch_len_sec)
-            if signalArray is None: #epoch samples are not ready yet
-                continue
-
-            # Process the data
+        #preprocessing again
+        featuresDF = pd.DataFrame()
+        for iTrial in range(len(labels)):
+            signalArray = recordedSignal[iTrial, :, :]
             curTrialData = signalProc(signalArray, DSIparser)
-            # Append to the data frame
             featuresDF = pd.concat([featuresDF, curTrialData], axis=1)
-            # Save current trial label
-            labels[iTrial + trials_N * (i - 1)] = action[i].value
 
-            print('Collecting SSVEP training data:  ' + str(action[i]) + ' trial #' + str(iTrial))
+    else:
+        # Parameters
+        # target_frq = [6, 7.5, 11] # Used frequencies
+        action = [Commands.idle, Commands.up, Commands.down, Commands.flip]
+        nLabels = len(action)
+        nTrials = 20  # Trials per condition
 
-            iTrial += 1
+        # Text to speech engine
+        engine = pyttsx3.init()
+        triggerText = ['Do not focus on the blinks', 'Focus on the upper blink',
+                       'focus on the bottom blink', 'Close your eyes']
 
-    # Say training session is over
-    engine.say('Open your eyes')
-    engine.runAndWait()
+        # Allocation
+        labels = np.empty(shape=[0])
+        featuresDF = pd.DataFrame()
+        recordedSignal  = np.empty(shape=[0, 25, 600]) #save training data
+
+        # Collecting labeled data
+        for iLabel in range(nLabels):
+            # Say the current stimuli to focus on
+            engine.say(triggerText[iLabel])
+            engine.runAndWait()
+            labels = np.append(labels, np.ones(nTrials)*action[iLabel].value)
+            iTrial = 0
+            while iTrial<nTrials:
+                time.sleep(epoch_len_sec/2)  # Wait 1 second
+                signalArray = DSIparser.get_epoch(epoch_len_sec)
+                if signalArray is None: #epoch samples are not ready yet
+                    continue
+
+                # Save training data
+                recordedSignal = np.append(recordedSignal, np.expand_dims(signalArray, axis=0), axis=0)
+                # Process the data
+                curTrialData = signalProc(signalArray, DSIparser)
+                # Append to the data frame
+                featuresDF = pd.concat([featuresDF, curTrialData], axis=1)
+
+                print('Collecting SSVEP training data:  ' + str(action[iLabel]) + ' trial #' + str(iTrial))
+
+                iTrial += 1
+
+        # Say training session is over
+        engine.say('Open your eyes')
+        engine.runAndWait()
+
+        #save training data
+        with open("SSVEPtraindata.pkl", 'wb') as file:  # save train data
+            pickle.dump(recordedSignal, file)
+            pickle.dump(featuresDF, file)
+            pickle.dump(labels, file)
+
 
     # Train classifier
-    model = LGBMClassifier()
+    model = LGBMClassifier(reg_lambda=0.05)
+
+    X_train, X_test, y_train, y_test = train_test_split(featuresDF.transpose(), labels, test_size=0.3) # random_state=0
+    model.fit(X_train, y_train)
+    #
+    # print('Training accuracy {:.4f}'.format(model.score(featuresDF.transpose(), labels)))
+    pred_train = model.predict(X_train)
+    pred_test = model.predict(X_test)
+    print('train accuracy score: {0:0.4f}'.format(metrics.accuracy_score(y_train, pred_train)))
+    print('test accuracy score: {0:0.4f}'.format(metrics.accuracy_score(y_test, pred_test)))
+    cm_train = metrics.confusion_matrix(y_train,pred_train)
+    cm_test = metrics.confusion_matrix(y_test, pred_test)
+    disp = metrics.ConfusionMatrixDisplay(confusion_matrix=cm_train, display_labels = ['idle','up','down','flip'])
+    disp.plot()
+    plt.show()
+    disp = metrics.ConfusionMatrixDisplay(confusion_matrix=cm_test, display_labels = ['idle','up','down','flip'])
+    disp.plot()
+    plt.show()
+    # print('Confusion matrix\n\n', cm)
+
     model.fit(featuresDF.transpose(), labels)
 
     return model

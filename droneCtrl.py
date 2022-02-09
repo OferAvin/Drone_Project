@@ -81,8 +81,8 @@ def run(CommandsQueue):
         #execute next command from the que
         if not CommandsQueue.empty():
             command = CommandsQueue.get()
-            timeStamp = str(datetime.datetime.now())
-            print('Command for Drone: ' + str(command[0]) + ' at time ' + timeStamp)
+            # timeStamp = str(datetime.datetime.now())
+            print('Command for Drone: ' + str(command[0]) + ' at time ' + command[1])
 
             if command[0] == Commands.up:
                 if is_airborn:

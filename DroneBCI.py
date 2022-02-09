@@ -21,13 +21,13 @@ if __name__ == "__main__":
     # commands queue
     CommandsQueue = queue.Queue(0)
 
+    #auto takeoff
+    from droneCtrl import Commands
+    CommandsQueue.put([Commands.up, 'AUTO TAKE OFF'])
+
     # present main window (now only starts the SSVEP stimuli)
     pFlicker = Process(target=Show_Flashes.main)
     pFlicker.start()
-
-    # connect drone (drone video should apear together with the flickers while training)
-    tDrone = threading.Thread(target=drone.run, args=(CommandsQueue,))
-    tDrone.start()
 
     # train/load models
     ans = input('Train MI model? Y/N')
@@ -38,6 +38,10 @@ if __name__ == "__main__":
     # start the online session
     tOnline = threading.Thread(target=eegSession.run_online, args=(CommandsQueue,))
     tOnline.start()
+
+    # connect drone (drone video should apear together with the flickers while training)
+    tDrone = threading.Thread(target=drone.run, args=(CommandsQueue,))
+    tDrone.start()
 
     # stops with ctrl+C
     pFlicker.join() #kill
