@@ -8,6 +8,7 @@ import Show_Flashes
 from multiprocessing import Process
 import signal as sig
 import Session as sess
+from droneCtrl import Commands
 
 
 if __name__ == "__main__":
@@ -22,7 +23,6 @@ if __name__ == "__main__":
     CommandsQueue = queue.Queue(0)
 
     #auto takeoff
-    from droneCtrl import Commands
     CommandsQueue.put([Commands.up, 'AUTO TAKE OFF'])
 
     # present main window (now only starts the SSVEP stimuli)
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     tDrone = threading.Thread(target=drone.run, args=(CommandsQueue,))
     tDrone.start()
 
-    # stops with ctrl+C
+    #stops with ctrl+C
     pFlicker.join() #kill
     tOnline.join()
     tDrone.join()
