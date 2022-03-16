@@ -31,20 +31,20 @@ class Session:
 
         self.eeg = eeg.EEG(DSIparser, self.epoch_len_sec)
 
-    def trainMImodel(self, load_model = False):
+    def trainMImodel(self, load_recorded_trials_flg = False, load_model_flg = False):
 
-        if load_model:
+        if load_model_flg:
             self.modelMI = pickle.load(open(self.modelMIfn, 'rb'))
         else:
-            self.modelMI = offline_experiment(self.eeg)
+            self.modelMI = offline_experiment(self.eeg, load_recorded_trials_flg)
 
             with open(self.modelMIfn, 'wb') as file: #save model
                 pickle.dump(self.modelMI, file)
         if not self.modelMI:
             raise Exception("*****Something went wrong: MI model not found*****")
 
-    def trainSSVEPmodel(self, load_model = False):
-        if load_model:
+    def trainSSVEPmodel(self, load_model_flg = False):
+        if load_model_flg:
             self.modelSSVEP = pickle.load(open(self.modelSSVEPfn, 'rb'))
         else:
             self.eeg.on()

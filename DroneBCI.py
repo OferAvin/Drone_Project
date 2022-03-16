@@ -31,7 +31,12 @@ if __name__ == "__main__":
 
     # train/load models
     ans = input('Train MI model? Y/N')
-    eegSession.trainMImodel(ans.upper() == 'N')
+    load_model_flg = ans.upper() == 'N'
+    load_recorded_trials_flg = False
+    if load_model_flg == False:
+        ans = input('Load trials from file? Y/N')
+        load_recorded_trials_flg = ans.upper() == 'Y'
+    eegSession.trainMImodel(load_recorded_trials_flg, load_model_flg)
     ans = input('Train SSVEP model? Y/N')
     eegSession.trainSSVEPmodel(ans.upper() == 'N')
 

@@ -70,7 +70,6 @@ for Label = labels %group data by labels
     project_params.minSectLenSec = project_params.augmentation_factor * sum(train_data.labels==Label) * trial_len_sec;
     [EEG, ~] = simulate_nft(NFTparams, Spectra, project_params, plot_flg);
     %post-processing
-    EEG = pop_select(EEG, 'nochannel', NON_EEG_ELECTRODES);
     EEG = pop_resample(EEG, project_params.fs);
     EEG = eeg2epoch(EEG,trial_len_sec);
 
@@ -83,4 +82,8 @@ for Label = labels %group data by labels
 end
 
 %save
-save([in_fp 'augmented_train_data.mat'],'augmented_data','train_data');
+train_data_trials = train_data.trials;
+train_data_labels = train_data.labels;
+augmented_data_trials = augmented_data.trials;
+augmented_data_labels = augmented_data.labels;
+save([in_fp 'augmented_train_data.mat'],'train_data_trials','train_data_labels','augmented_data_trials','augmented_data_labels');
