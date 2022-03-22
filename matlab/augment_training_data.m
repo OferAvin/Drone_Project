@@ -68,7 +68,7 @@ for Label = labels %group data by labels
 
     %augment
     project_params.minSectLenSec = project_params.augmentation_factor * sum(train_data.labels==Label) * trial_len_sec;
-    [EEG, ~] = simulate_nft(NFTparams, Spectra, project_params, plot_flg);
+    [EEG, ~] = simulate_nft(NFTparams, Spectra, project_params, [], plot_flg);
     %post-processing
     EEG = pop_resample(EEG, project_params.fs);
     EEG = eeg2epoch(EEG,trial_len_sec);

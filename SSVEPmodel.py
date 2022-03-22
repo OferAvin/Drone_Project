@@ -134,7 +134,12 @@ def trainModel(DSIparser, epoch_len_sec):
 
     # Train classifier
     model = LGBMClassifier(reg_lambda=0.05)
+    model_validation(model, featuresDF, labels) #check model accuracy
+    model.fit(featuresDF.transpose(), labels)
 
+    return model
+
+def model_validation(model, featuresDF, labels):
     X_train, X_test, y_train, y_test = train_test_split(featuresDF.transpose(), labels, test_size=0.3) # random_state=0
     model.fit(X_train, y_train)
     #
@@ -152,7 +157,3 @@ def trainModel(DSIparser, epoch_len_sec):
     disp.plot()
     plt.show()
     # print('Confusion matrix\n\n', cm)
-
-    model.fit(featuresDF.transpose(), labels)
-
-    return model

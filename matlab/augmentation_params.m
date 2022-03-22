@@ -1,7 +1,7 @@
 %doc nft analysis parameters
 function project_params = augmentation_params()
 
-project_params.code_fp = 'C:\My Files\Work\BGU\scripts';
+project_params.code_fp = '..\..\..';
 project_params.data_fp = 'C:\My Files\Work\BGU\Datasets\drone BCI';
 project_params.electrodes_fn = [project_params.data_fp '\electrodes\Standard-10-20-Cap19.ced'];
 project_params.head_radius = 1; %used to get rid of out-of-scalp channels
