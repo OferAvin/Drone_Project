@@ -49,11 +49,13 @@ project_params.psd.overlap_percent = 0;
 %%%NFT fit
 project_params.nftfit.CZname = 'Cz'; %the CZ electrode
 project_params.nftfit.freqBandHz = [1 40]; %maybe narrow, to avoid poor fitting 
-project_params.nftfit.npoints = 1.5e4;
+project_params.nftfit.npoints = 1e5;
 project_params.nftfit.chisqThrsh = 7; %for spatial fit warning
 
 %%%%NFT simulation
 project_params.nftsim.grid_edge = 12; % pi/4*(grid_edge/2)^2 >= number of experimental electrode inside head radius
-delta_t = 2^(-ceil(log2(project_params.fs))); 
-project_params.nftsim.fs = 1/delta_t; %512
-project_params.nftsim.out_dt = delta_t;
+% delta_t = 2^(-ceil(log2(project_params.fs))); 
+% project_params.nftsim.fs = 1/delta_t; %512
+% project_params.nftsim.out_dt = delta_t;
+project_params.nftsim.fs = project_params.fs*2;
+project_params.nftsim.out_dt = 1/project_params.fs;
