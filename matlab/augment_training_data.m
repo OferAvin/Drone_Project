@@ -68,11 +68,10 @@ for Label = labels %group data by labels
     end
 
     %for normalization
-    chanPower = bandpower(eeg2epoch(EEG).data' ,EEG.srate, project_params.nftfit.freqBandHz);
+%     chanPower = bandpower(eeg2epoch(EEG).data' ,EEG.srate, project_params.nftfit.freqBandHz);
     chanAVs = mean(EEG.data,[2 3]);
-%     EEG_filtered = pop_eegfiltnew(EEG, project_params.pipelineParams.passBandHz{1}, project_params.pipelineParams.passBandHz{2});
-%     chanSTDs = std(EEG_filtered.data,0,[2 3]);
-%     chanRMSs = rms(EEG.data,[2 3]);
+    EEG_filtered = pop_eegfiltnew(EEG, project_params.pipelineParams.passBandHz{1}, project_params.pipelineParams.passBandHz{2});
+    chanSTDs = std(EEG_filtered.data,0,[2 3]);
 
     trial_len_sec = EEG.pnts/EEG.srate;
     project_params.psd.window_sec = trial_len_sec;
@@ -83,7 +82,7 @@ for Label = labels %group data by labels
         project_params.nftfit.CZname = EEG.chanlocs(iChan).labels;
         %fit
         try
-            [NFTparams, Spectra] = fit_nft(eeg2epoch(EEG), project_params, 0, 0);
+            [NFTparams, Spectra] = fit_nft(eeg2epoch(EEG), project_params, 0);
         catch
             error([fn ':  fit_nft error']);
         end
@@ -96,12 +95,12 @@ for Label = labels %group data by labels
         project_params.nftsim.grid_edge = 1;
         [~, ~, central_chan_data] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
         %normalize
-        EEGaug.data(strcmp({EEGaug.chanlocs.labels},project_params.nftfit.CZname), :) = ...
-        (central_chan_data - mean(central_chan_data)) * ...
-            sqrt(chanPower(iChan) / bandpower(central_chan_data, project_params.fs, project_params.nftfit.freqBandHz))...
-            + chanAVs(iChan); 
-%         central_chan_data = central_chan_data * chanRMSs(iChan) / rms(central_chan_data);
-%         central_chan_data = zscore(central_chan_data) * chanSTDs(iChan) + chanAVs(iChan);
+        EEGaug.data(strcmp({EEGaug.chanlocs.labels},project_params.nftfit.CZname), :) ...
+           = zscore(central_chan_data) * chanSTDs(iChan) + chanAVs(iChan);
+%         = (central_chan_data - mean(central_chan_data)) * ...
+%             sqrt(chanPower(iChan) / bandpower(central_chan_data, project_params.fs, project_params.nftfit.freqBandHz))...
+%             + chanAVs(iChan); 
+
     end
     
     if plot_flg %plot augmented data
