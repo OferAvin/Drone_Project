@@ -11,6 +11,7 @@ from droneCtrl import Commands
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import pickle
 
 def signalProc(signalArray, DSIparser):
@@ -140,6 +141,8 @@ def trainModel(DSIparser, epoch_len_sec):
     return model
 
 def model_validation(model, featuresDF, labels):
+    mpl.use('TkAgg')
+
     X_train, X_test, y_train, y_test = train_test_split(featuresDF.transpose(), labels, test_size=0.3) # random_state=0
     model.fit(X_train, y_train)
     #
@@ -152,8 +155,8 @@ def model_validation(model, featuresDF, labels):
     cm_test = metrics.confusion_matrix(y_test, pred_test)
     disp = metrics.ConfusionMatrixDisplay(confusion_matrix=cm_train, display_labels = ['idle','up','down','flip'])
     disp.plot()
-    plt.show()
+    plt.show(block=False)
     disp = metrics.ConfusionMatrixDisplay(confusion_matrix=cm_test, display_labels = ['idle','up','down','flip'])
     disp.plot()
-    plt.show()
+    plt.show(block=False)
     # print('Confusion matrix\n\n', cm)
