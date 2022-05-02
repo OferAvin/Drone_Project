@@ -78,6 +78,7 @@ for Label = labels %group data by labels
     project_params.minSectLenSec = project_params.augmentation_factor * sum(train_data.labels==Label) * trial_len_sec;
     project_params.nftsim.grid_edge = orig_grid_edge; 
 
+    EEGaug = [];
     for iChan=1:EEG.nbchan %augment each channel separately
         project_params.nftfit.CZname = EEG.chanlocs(iChan).labels;
         %fit
@@ -88,20 +89,34 @@ for Label = labels %group data by labels
         end
         %simulate
         if iChan == 1
-            [EEGaug, ~, ~] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
+            [EEGaug, ~, ~, ~] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
             EEGaug.data = EEGaug.data*0;
             EEGaug.srate = project_params.fs;
+            EEGaug.bad_channels = [];
         end
         project_params.nftsim.grid_edge = 1;
-        [~, ~, central_chan_data] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
-        %normalize
-        EEGaug.data(strcmp({EEGaug.chanlocs.labels},project_params.nftfit.CZname), :) ...
-           = zscore(central_chan_data) * chanSTDs(iChan) + chanAVs(iChan);
-%         = (central_chan_data - mean(central_chan_data)) * ...
-%             sqrt(chanPower(iChan) / bandpower(central_chan_data, project_params.fs, project_params.nftfit.freqBandHz))...
-%             + chanAVs(iChan); 
+        [~, ~, central_chan_data, isSimSuccess] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
+        if ~isSimSuccess
+            s=rng; rng(randi(100));
+            [~, ~, central_chan_data, isSimSuccess] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
+            rng(s);
+        end
+
+        if isSimSuccess
+            %normalize
+            EEGaug.data(strcmp({EEGaug.chanlocs.labels},project_params.nftfit.CZname), :) ...
+               = zscore(central_chan_data) * chanSTDs(iChan) + chanAVs(iChan);
+%                 = (central_chan_data - mean(central_chan_data)) * ...
+%                 sqrt(chanPower(iChan) / bandpower(central_chan_data, project_params.fs, project_params.nftfit.freqBandHz))...
+%                 + chanAVs(iChan); 
+        else
+            EEGaug.bad_channels = [EEGaug.bad_channels {project_params.nftfit.CZname}];
+        end        
 
     end
+    %interpolate bad channels
+    EEGaug = pop_select(EEGaug, 'nochannel',EEGaug.bad_channels);
+    EEGaug = eeg_interp(EEGaug, readlocs(project_params.electrodes_fn));
     
     if plot_flg %plot augmented data
         EEGplot = pop_select(EEGaug, 'nochannel', NON_EEG_ELECTRODES);
