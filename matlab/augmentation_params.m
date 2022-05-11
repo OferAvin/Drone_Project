@@ -47,8 +47,8 @@ project_params.psd.window_sec = 2;
 project_params.psd.overlap_percent = 0;
 
 %%%NFT fit
-project_params.nftfit.params2fit = {'Gee','Gei','Ges','Gse','Gsr','Gre','Grs','Alpha','Beta','t0', 'EMGa'};
-% project_params.nftfit.params2fit = {};
+% project_params.nftfit.params2fit = {'Gee','Gei','Ges','Gse','Gsr','Gre','Grs','Alpha','Beta','t0', 'EMGa'};
+project_params.nftfit.params2fit = {}; %use typical
 project_params.nftfit.spatial_fit_flg = false;
 project_params.nftfit.psdMethod = 'fft';
 project_params.nftfit.CZname = 'Cz'; %the CZ electrode
