@@ -13,23 +13,29 @@ from droneCtrl import Commands
 if __name__ == "__main__":
 
     #connect to DSI headset to read epochs
-    DSIparser = dsi.TCPParser('localhost', 8844) #make sure that DSI streamer client port 8844 is active
-    sig.signal(sig.SIGINT, DSIparser.onlineHandler) # Catch ctrl+C error
-    # #run offline
-    # DSIparser = None;
+    # DSIparser = dsi.TCPParser('localhost', 8844) #make sure that DSI streamer client port 8844 is active
+    # sig.signal(sig.SIGINT, DSIparser.onlineHandler)  # Catch ctrl+C error
+    # run offline
+    DSIparser = None
+    while True:
+        try:
+            num_trials = int(input('Number of trials?'))
+            break
+        except:
+            print("That's not a valid option!")
 
-    #init eeg decoding session
-    eegSession = sess.Session(DSIparser)
+    # init eeg decoding session
+    eegSession = sess.Session(DSIparser, num_trials)
 
-    #commands queue
+    # commands queue
     CommandsQueue = queue.Queue(0)
     CommandsQueue.put([Commands.up, 'AUTO TAKE OFF']) #auto takeoff
 
-    #present main window (now only starts the SSVEP stimuli)
-    pFlicker = Process(target=Show_Flashes.main)
-    pFlicker.start()
+    # main window (now only starts the SSVEP stimuli)
+    # pFlicker = Process(target=Show_Flashes.main)
+    # pFlicker.start()
 
-    #train/load models
+    # train/load models
     ans = input('Train MI model? Y/N')
     load_model_flg = ans.upper() == 'N'
     load_recorded_trials_flg = False
@@ -40,15 +46,16 @@ if __name__ == "__main__":
     ans = input('Train SSVEP model? Y/N')
     eegSession.trainSSVEPmodel(ans.upper() == 'N')
 
-    #start the online session
+
+    # start the online session
     tOnline = threading.Thread(target=eegSession.run_online, args=(CommandsQueue,))
     tOnline.start()
-
-    #connect drone (drone video should apear together with the flickers while training)
-    tDrone = threading.Thread(target=drone.run, args=(CommandsQueue,))
-    tDrone.start()
-
-    #stops with ctrl+C
-    pFlicker.join() #kill
-    tOnline.join()
-    tDrone.join()
+    #
+    # # connect drone (drone video should apear together with the flickers while training)
+    # tDrone = threading.Thread(target=drone.run, args=(CommandsQueue,))
+    # tDrone.start()
+    #
+    # #stops with ctrl+C
+    # pFlicker.join() #kill
+    # tOnline.join()
+    # tDrone.join()

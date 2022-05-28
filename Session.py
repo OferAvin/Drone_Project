@@ -16,7 +16,7 @@ class Session:
 
     """
 
-    def __init__(self, DSIparser):
+    def __init__(self, DSIparser, num_trials):
 
         #memebers
         self.modelMI = None
@@ -28,6 +28,7 @@ class Session:
         self.modelSSVEPfn = "TrainedSSVEPmodel.pkl"
         self.epoch_len_sec = 2
         self.acc_thresh = 0.5 #accuracy threshold
+        self.num_trials = num_trials
 
         self.eeg = eeg.EEG(DSIparser, self.epoch_len_sec)
 
@@ -36,7 +37,7 @@ class Session:
         if load_model_flg:
             self.modelMI = pickle.load(open(self.modelMIfn, 'rb'))
         else:
-            self.modelMI = offline_experiment(self.eeg, load_recorded_trials_flg)
+            self.modelMI = offline_experiment(self.eeg, self.num_trials, load_recorded_trials_flg)
 
             with open(self.modelMIfn, 'wb') as file: #save model
                 pickle.dump(self.modelMI, file)
