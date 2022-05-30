@@ -1,4 +1,13 @@
 # decode paradigms from EEG
+
+from enum import Enum
+class SessionType(Enum):
+    Online = 0
+    OfflineExpSSVEP = 1
+    OfflineExpMI = 2
+    OfflineTrainCspMI = 3
+    OfflineTrainLdaMI = 4
+
 import pickle
 import time
 import datetime
@@ -31,34 +40,31 @@ class Session:
 
         self.eeg = eeg.EEG(DSIparser, self.epoch_len_sec)
 
-    def trainMImodel(self, load_recorded_trials_flg = False, load_model_flg = False):
-
-        if load_model_flg:
-            self.modelMI = pickle.load(open(self.modelMIfn, 'rb'))
-        else:
-            self.modelMI = offline_experiment(self.eeg, load_recorded_trials_flg)
-
-            with open(self.modelMIfn, 'wb') as file: #save model
-                pickle.dump(self.modelMI, file)
-        if not self.modelMI:
-            raise Exception("*****Something went wrong: MI model not found*****")
-
-    def trainSSVEPmodel(self, load_model_flg = False):
-        if load_model_flg:
-            self.modelSSVEP = pickle.load(open(self.modelSSVEPfn, 'rb'))
-        else:
+    def train_model(self, sessType: SessionType):
+        if sessType == SessionType.Online:
+            raise Exception("run Online directly with run_online!")
+        elif sessType == SessionType.OfflineExpSSVEP:
             self.eeg.on()
             self.modelSSVEP = SSVEPmodel.trainModel(self.DSIparser,self.epoch_len_sec)
             self.eeg.off()
-
-            with open(self.modelSSVEPfn, 'wb') as file:  # save model
+            with open(self.modelSSVEPfn, 'wb') as file:  # save SSVEP model
                 pickle.dump(self.modelSSVEP, file)
-        if not self.modelSSVEP:
-            raise Exception("*****Something went wrong: SSVEP model not found*****")
+        else:
+            self.modelMI = pickle.load(open(self.modelMIfn, 'rb'))
+            if not self.modelMI and sessType != SessionType.OfflineExpMI:
+                raise Exception("*****Something went wrong: MI/SSVEP model not found*****")
+            self.modelMI = offline_experiment(self.eeg, self.modelMI, sessType)
+            with open(self.modelMIfn, 'wb') as file: #save MI model
+                pickle.dump(self.modelMI, file)
 
     def run_online(self, CommandsQueue):
 
         playback_flg = False
+
+        self.modelMI = pickle.load(open(self.modelMIfn, 'rb'))
+        self.modelSSVEP = pickle.load(open(self.modelSSVEPfn, 'rb'))
+        if not self.modelMI or not self.modelSSVEP:
+            raise Exception("*****Something went wrong: MI/SSVEP model not found*****")
 
         self.DSIparser.runOnline = True
         self.eeg.on()

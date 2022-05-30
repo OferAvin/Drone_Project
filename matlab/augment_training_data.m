@@ -4,10 +4,20 @@ clear all; close all;
 addpath('..\..\..\DOC');
 addpath(genpath('..\..\..\nft'));
 
-NON_EEG_ELECTRODES = {'A1','A2','X1','X2','X3','TRG','Pz_CM'};
-
 project_params = augmentation_params();
-orig_grid_edge = project_params.nftsim.grid_edge;
+
+OP_MODE = 'CSP_SOURCE_AUG'; % EEG_CLEAN_ONLY  RAW_EEG_AUG  CSP_SOURCE_AUG
+
+if strcmp(OP_MODE,'CSP_SOURCE_AUG')
+    project_params.nftfit.freqBandHz = [8 29];
+    out_fn = 'augmented_source_data.mat';
+elseif strcmp(OP_MODE,'RAW_EEG_AUG')
+    orig_grid_edge = project_params.nftsim.grid_edge;
+    out_fn = 'augmented_train_data.mat';
+else %EEG_CLEAN_ONLY
+    out_fn = 'clean_train_data.mat';
+end
+project_params.nftsim.grid_edge = 1;
 
 plot_flg = false;
 
@@ -15,111 +25,93 @@ plot_flg = false;
 
 [fn, in_fp] = uigetfile([project_params.data_fp '\*.mat'], 'select trainig data');
 train_data = load([in_fp fn]);
+clean_train_data.trials = [];
+clean_train_data.labels = [];
 augmented_data.trials = [];
 augmented_data.labels = [];
 
-poolobj = gcp; %parpool
+% poolobj = gcp; %parpool
 datetime(now,'ConvertFrom','datenum');
 
 labels = unique(train_data.labels);
 for Label = labels %group data by labels
 
-    %convert to EEGLAB format
-    EEG = [];
-    EEG.setname = ['Training_Dat: label #' num2str(Label)];
-    EEG.filename = [fn(1:end-3) 'set'];
-    EEG.filepath = in_fp;
-    EEG.srate = project_params.fs;
-    EEG.data = permute(train_data.trials(train_data.labels==Label,:,:), [3,2,1]);
-    [EEG.nbchan,EEG.pnts,EEG.trials] = size(EEG.data);
-    EEG.times = [0:(EEG.pnts-1)]/EEG.srate*1000;
-    EEG.xmin = 0;
-    EEG.xmax = EEG.times(end)/1000;
-    EEG.ref        = [];
-    EEG.icawinv    = [];
-    EEG.icasphere  = [];
-    EEG.icaweights = [];
-    EEG.icaact     = [];
-    EEG.chanlocs   = [];
-    EEG.bad_channels = [];
-    EEG = eeg_checkset(EEG);
-    EEG.chanlocs = readlocs(project_params.electrodes_fn);
-    EEG = pop_select(EEG, 'nochannel', NON_EEG_ELECTRODES);
-    
-    if plot_flg %plot "raw" train data
-        figure; topoplot([],EEG.chanlocs, 'style', 'blank',  'electrodes', 'labelpoint', 'chaninfo', EEG.chaninfo);
-        pop_eegplot(EEG, 1, 0, 0, [], 'srate',EEG.srate, 'winlength',6, 'eloc_file',[]);  
+    EEG = EEGLAB_clean(train_data, fn, in_fp, Label, project_params, OP_MODE, plot_flg);
+    if strcmp(OP_MODE,'CSP_SOURCE_AUG')
+        EEGclean = EEG;
+    else
+        EEGclean = eeg_interp(EEG, readlocs(project_params.electrodes_fn));
     end
-    
-    %clean data
-    EEGclean = eeglab_pipeline(EEG, project_params.pipelineParams, 0, 0);
-    EEG.rejTrials = EEGclean.rejTrials;
-    EEG = pop_rejepoch(EEG, EEG.rejTrials,0);
-    EEG.bad_channels = EEGclean.bad_channels;
-    EEG = pop_select(EEG, 'nochannel',EEG.bad_channels);
-    EEG = eeg_interp(EEG, EEGclean.chanlocs);
-    EEG = eeg_checkset(EEG); 
-
-    if plot_flg %plot preprocessed data
-        EEGplot = pop_eegfiltnew(EEG, 0.1, []);
-        pop_eegplot(EEGplot, 1, 0, 0, [], 'srate',EEG.srate, 'winlength',6, 'eloc_file',[]);
-        figure; pop_spectopo(EEG, 1, [], 'EEG', 'freqrange',[0 EEG.srate/2], 'percent',10, 'electrodes','off');
-        channel_map_topoplot(eeg2epoch(EEG), [], false);
+    cleanData = permute(EEGclean.data, [3,2,1]);
+    cleanLabels = Label*int32(ones(1,EEGclean.trials));
+    clean_train_data.trials = cat(1,clean_train_data.trials, cleanData);
+    clean_train_data.labels = cat(2,clean_train_data.labels, cleanLabels);
+    if strcmp(OP_MODE,'EEG_CLEAN_ONLY')
+        continue;
     end
 
     %for normalization
 %     chanPower = bandpower(eeg2epoch(EEG).data' ,EEG.srate, project_params.nftfit.freqBandHz);
     chanAVs = mean(EEG.data,[2 3]);
-    EEG_filtered = pop_eegfiltnew(EEG, project_params.pipelineParams.passBandHz{1}, project_params.pipelineParams.passBandHz{2});
-    chanSTDs = std(EEG_filtered.data,0,[2 3]);
+    chanSTDs = std(EEG.data,0,[2 3]);
 
     trial_len_sec = EEG.pnts/EEG.srate;
     project_params.psd.window_sec = trial_len_sec;
-    project_params.minSectLenSec = project_params.augmentation_factor * sum(train_data.labels==Label) * trial_len_sec;
-    project_params.nftsim.grid_edge = orig_grid_edge; 
+    project_params.minSectLenSec = round(project_params.augmentation_factor * length(train_data.labels)/length(labels)) * trial_len_sec;
 
     EEGaug = [];
     for iChan=1:EEG.nbchan %augment each channel separately
-        project_params.nftfit.CZname = EEG.chanlocs(iChan).labels;
         %fit
         try
-            [NFTparams, Spectra] = fit_nft(eeg2epoch(EEG), project_params, 0);
+            [NFTparams, Spectra] = fit_nft(eeg2epoch(EEG), project_params, iChan, 0);
         catch
             error([fn ':  fit_nft error']);
         end
         %simulate
-        if iChan == 1
-            [EEGaug, ~, ~, ~] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
-            EEGaug.data = EEGaug.data*0;
-            EEGaug.srate = project_params.fs;
-            EEGaug.bad_channels = [];
+        if iChan == 1 
+            if strcmp(OP_MODE,'CSP_SOURCE_AUG')
+                EEGaug.data = [];
+                EEGaug.chanlocs = EEG.chanlocs; 
+            else
+                project_params.nftsim.grid_edge = orig_grid_edge; 
+                [EEGaug, ~, ~, ~] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
+                EEGaug.data = EEGaug.data*0;
+                EEGaug.bad_channels = [];
+                project_params.nftsim.grid_edge = 1;
+            end
         end
-        project_params.nftsim.grid_edge = 1;
+        
         [~, ~, central_chan_data, isSimSuccess] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
         if ~isSimSuccess
             s=rng; rng(randi(100));
             [~, ~, central_chan_data, isSimSuccess] = simulate_nft(NFTparams, Spectra, project_params, iChan, 0);
             rng(s);
         end
-
+        %normalize
+        central_chan_data = zscore(central_chan_data) * chanSTDs(iChan) + chanAVs(iChan);
+%         central_chan_data = (central_chan_data - mean(central_chan_data)) * ...
+%             sqrt(chanPower(iChan) / bandpower(central_chan_data, project_params.fs, project_params.nftfit.freqBandHz))...
+%             + chanAVs(iChan);
+        %place in EEGaug
         if isSimSuccess
-            %normalize
-            EEGaug.data(strcmp({EEGaug.chanlocs.labels},project_params.nftfit.CZname), :) ...
-               = zscore(central_chan_data) * chanSTDs(iChan) + chanAVs(iChan);
-%                 = (central_chan_data - mean(central_chan_data)) * ...
-%                 sqrt(chanPower(iChan) / bandpower(central_chan_data, project_params.fs, project_params.nftfit.freqBandHz))...
-%                 + chanAVs(iChan); 
+            EEGaug.data(strcmp({EEGaug.chanlocs.labels},EEG.chanlocs(iChan).labels), :) = central_chan_data;
         else
-            EEGaug.bad_channels = [EEGaug.bad_channels {project_params.nftfit.CZname}];
+            if strcmp(OP_MODE,'CSP_SOURCE_AUG')
+                error('Augmentation Failure!');
+            end
+            EEGaug.bad_channels = [EEGaug.bad_channels {EEG.chanlocs(iChan).labels}];
         end        
-
     end
-    %interpolate bad channels
-    EEGaug = pop_select(EEGaug, 'nochannel',EEGaug.bad_channels);
-    EEGaug = eeg_interp(EEGaug, readlocs(project_params.electrodes_fn));
     
-    if plot_flg %plot augmented data
-        EEGplot = pop_select(EEGaug, 'nochannel', NON_EEG_ELECTRODES);
+    %interpolate bad channels
+    if strcmp(OP_MODE,'RAW_EEG_AUG')
+        EEGaug = pop_select(EEGaug, 'nochannel',EEGaug.bad_channels);
+        EEGaug = eeg_interp(EEGaug, readlocs(project_params.electrodes_fn));
+    end
+       
+    %plot augmented data
+    if plot_flg && strcmp(OP_MODE,'RAW_EEG_AUG')
+        EEGplot = pop_select(EEGaug, 'nochannel', project_params.NON_EEG_ELECTRODES);
         EEGplot = pop_eegfiltnew(EEGplot, 0.1, []);
         pop_eegplot(EEGplot, 1, 0, 0, [], 'srate',EEGaug.srate, 'winlength',6, 'eloc_file',[]);
         figure; pop_spectopo(EEGaug, 1, [], 'EEG', 'freqrange',[0 EEGaug.srate/2], 'percent',10, 'electrodes','off');
@@ -127,19 +119,20 @@ for Label = labels %group data by labels
     end
 
     %concatenate augmented data
-    EEGaug = eeg2epoch(EEGaug,trial_len_sec);
-    augData = permute(EEGaug.data, [3,2,1]);
-    augLabels = Label*int32(ones(1,EEGaug.trials));
+    nAugTrials = project_params.minSectLenSec/trial_len_sec;
+    augData = reshape(EEGaug.data,[size(EEGaug.data,1),EEG.pnts,nAugTrials]);
+    augData = permute(augData, [3,2,1]);
+    augLabels = Label*int32(ones(1,nAugTrials));
     augmented_data.trials = cat(1,augmented_data.trials, augData);
     augmented_data.labels = cat(2,augmented_data.labels, augLabels);
 
 end
 datetime(now,'ConvertFrom','datenum');
-delete(poolobj);
+% delete(poolobj);
 
 %save
-train_data_trials = train_data.trials;
-train_data_labels = train_data.labels;
+train_data_trials = clean_train_data.trials;
+train_data_labels = clean_train_data.labels;
 augmented_data_trials = augmented_data.trials;
 augmented_data_labels = augmented_data.labels;
-save([in_fp 'augmented_train_data.mat'],'train_data_trials','train_data_labels','augmented_data_trials','augmented_data_labels');
+save([in_fp out_fn],'train_data_trials','train_data_labels','augmented_data_trials','augmented_data_labels');

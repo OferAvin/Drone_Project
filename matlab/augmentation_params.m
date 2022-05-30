@@ -4,6 +4,7 @@ function project_params = augmentation_params()
 project_params.code_fp = '..\..\..';
 project_params.data_fp = 'C:\My Files\Work\BGU\Datasets\drone BCI';
 project_params.electrodes_fn = [project_params.data_fp '\electrodes\Standard-10-20-Cap19.ced'];
+project_params.NON_EEG_ELECTRODES = {'A1','A2','X1','X2','X3','TRG','Pz_CM'};
 project_params.head_radius = 1; %used to get rid of out-of-scalp channels
 project_params.fs = 300;
 project_params.augmentation_factor = 10;
@@ -17,7 +18,7 @@ pipelineParams.resampleFsHz = [];
 pipelineParams.badchan_time_percent = 0.3;
 pipelineParams.badchan_window_step_length_sec = 5;
 pipelineParams.chan_z_score_thresh = 7;
-pipelineParams.epoch_max_std_thresh = 3;
+pipelineParams.epoch_max_std_thresh = 2.5;
 pipelineParams.epoch_min_std_thresh = 0.1;
 pipelineParams.bad_chan_in_epoch_percent = 0.15;
 %bad sections parameters:
@@ -51,8 +52,7 @@ project_params.psd.overlap_percent = 0;
 project_params.nftfit.params2fit = {}; %use typical
 project_params.nftfit.spatial_fit_flg = false;
 project_params.nftfit.psdMethod = 'fft';
-project_params.nftfit.CZname = 'Cz'; %the CZ electrode
-project_params.nftfit.freqBandHz = [1 40]; %maybe narrow, to avoid poor fitting 
+project_params.nftfit.freqBandHz = [3 40]; %maybe narrow, to avoid poor fitting 
 project_params.nftfit.npoints = 2e4;
 project_params.nftfit.chisqThrsh = 7; %for spatial fit warning
 

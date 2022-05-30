@@ -12,43 +12,51 @@ from droneCtrl import Commands
 
 if __name__ == "__main__":
 
-    #connect to DSI headset to read epochs
-    DSIparser = dsi.TCPParser('localhost', 8844) #make sure that DSI streamer client port 8844 is active
-    sig.signal(sig.SIGINT, DSIparser.onlineHandler) # Catch ctrl+C error
-    # #run offline
-    # DSIparser = None;
+    ans = input('Select Session Type:     0:Online   1:SSVEP training  2:MI training   3:Train MI Csp from file   4:Train MI Lda from file ')
+    sessType = sess.SessionType(int(ans))
+    # sessType = sess.SessionType.OfflineTrainCspMI
 
-    #init eeg decoding session
-    eegSession = sess.Session(DSIparser)
+    if sessType == sess.SessionType.OfflineTrainCspMI or sessType == sess.SessionType.OfflineTrainLdaMI:
+        eegSession = sess.Session(DSIparser=None)
+        eegSession.train_model(sessType)
 
-    #commands queue
-    CommandsQueue = queue.Queue(0)
-    CommandsQueue.put([Commands.up, 'AUTO TAKE OFF']) #auto takeoff
+    else:
 
-    #present main window (now only starts the SSVEP stimuli)
-    pFlicker = Process(target=Show_Flashes.main)
-    pFlicker.start()
+        #connect to DSI headset to read epochs
+        DSIparser = dsi.TCPParser('localhost', 8844) #make sure that DSI streamer client port 8844 is active
+        sig.signal(sig.SIGINT, DSIparser.onlineHandler) # Catch ctrl+C error
 
-    #train/load models
-    ans = input('Train MI model? Y/N')
-    load_model_flg = ans.upper() == 'N'
-    load_recorded_trials_flg = False
-    if load_model_flg == False:
-        ans = input('Load trials from file? Y/N')
-        load_recorded_trials_flg = ans.upper() == 'Y'
-    eegSession.trainMImodel(load_recorded_trials_flg, load_model_flg)
-    ans = input('Train SSVEP model? Y/N')
-    eegSession.trainSSVEPmodel(ans.upper() == 'N')
+        #init eeg decoding session
+        eegSession = sess.Session(DSIparser)
 
-    #start the online session
-    tOnline = threading.Thread(target=eegSession.run_online, args=(CommandsQueue,))
-    tOnline.start()
+        if sessType == sess.SessionType.OfflineExpMI:
+            eegSession.train_model(sessType)
 
-    #connect drone (drone video should apear together with the flickers while training)
-    tDrone = threading.Thread(target=drone.run, args=(CommandsQueue,))
-    tDrone.start()
+        else:
 
-    #stops with ctrl+C
-    pFlicker.join() #kill
-    tOnline.join()
-    tDrone.join()
+            #start the SSVEP stimuli
+            pFlicker = Process(target=Show_Flashes.main)
+            pFlicker.start()
+
+            if sessType == sess.SessionType.OfflineExpSSVEP:
+                eegSession.train_model(sessType)
+
+            else: #Online
+
+                #commands queue
+                CommandsQueue = queue.Queue(0)
+                CommandsQueue.put([Commands.up, 'AUTO TAKE OFF']) #auto takeoff
+
+                #start the online session
+                tOnline = threading.Thread(target=eegSession.run_online, args=(CommandsQueue,))
+                tOnline.start()
+
+                #connect drone (drone video should apear together with the flickers while training)
+                tDrone = threading.Thread(target=drone.run, args=(CommandsQueue,))
+                tDrone.start()
+
+                #stops with ctrl+C
+                pFlicker.join() #kill
+                tOnline.join()
+                tDrone.join()
+    # sys.exit()
