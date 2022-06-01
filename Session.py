@@ -25,7 +25,7 @@ class Session:
 
     """
 
-    def __init__(self, DSIparser):
+    def __init__(self, DSIparser, num_trials):
 
         #memebers
         self.modelMI = None

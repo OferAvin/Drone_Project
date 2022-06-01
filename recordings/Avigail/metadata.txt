@@ -1,0 +1,38 @@
+Experiment datetime: 2022-04-27 13:11:08.530749
+
+EEG Channels:
+*************
+Channel 1: P3
+Channel 2: C3
+Channel 3: F3
+Channel 4: Fz
+Channel 5: F4
+Channel 6: C4
+Channel 7: P4
+Channel 8: Cz
+Channel 9: CM
+Channel 10: A1
+Channel 11: Fp1
+Channel 12: Fp2
+Channel 13: T3
+Channel 14: T5
+Channel 15: O1
+Channel 16: O2
+Channel 17: X3
+Channel 18: X2
+Channel 19: F7
+Channel 20: F8
+Channel 21: X1
+Channel 22: A2
+Channel 23: T6
+Channel 24: T4
+Channel 25: TRG
+
+Experiment Data
+***************
+Experiment Type: Offline
+Num of trials: 100
+Trials length: 2
+Cue length: 0.25
+Labels Enum: {0: 'right', 1: 'left', 2: 'idle', 3: 'tongue', 4: 'legs'}
+Skip After: None
